@@ -1,7 +1,7 @@
 {
     "stage_name": "prod",
     "instance_count": 2,
-    "instance_type": "ml.m5.large",
+    "instance_type": "ml.t2.large",
     "auto_scaling": {
         "min_capacity": 2,
         "max_capacity": 10
