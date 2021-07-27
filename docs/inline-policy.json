@@ -1,0 +1,58 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Action": [
+                "s3:*"
+            ],
+            "Effect": "Allow",
+            "Resource": [
+                "arn:aws:s3:::cdktoolkit-*",
+                "arn:aws:s3:::drift-*"
+            ]
+        },
+        {
+            "Action": [
+                "lambda:*"
+            ],
+            "Effect": "Allow",
+            "Resource": [
+              "arn:aws:lambda:*:*:function:drift-*"
+            ]
+        },
+        {
+            "Action": [
+                "cloudformation:*",
+                "servicecatalog:*",
+                "events:*"
+            ],
+            "Effect": "Allow",
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "iam:CreateRole",
+                "iam:DeleteRole"
+            ],
+            "Resource": "arn:aws:iam::*:role/drift-*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "iam:GetRole",
+                "iam:PassRole",
+                "iam:GetRolePolicy",
+                "iam:AttachRolePolicy",
+                "iam:PutRolePolicy",
+                "iam:DetachRolePolicy",
+                "iam:DeleteRolePolicy",
+                "iam:CreateServiceLinkedRole"
+            ],
+            "Resource": [
+              "arn:aws:iam::*:role/drift-*",
+              "arn:aws:iam::*:role/service-role/AmazonSageMaker*"
+            ]
+        }
+    ]
+}
