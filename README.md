@@ -13,9 +13,22 @@ Once complete, you can Train and Deploy machine learning models, and send traffi
 
 ## Get Started
 
-You the following quick start to publish the custom SageMaker MLOps template:
+Use this following AWS CloudFormation quick start to create a custom [SageMaker MLOps project](https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-projects-templates-custom.html) template in the [AWS Service Catalog](https://aws.amazon.com/servicecatalog/) and configure the portfolio and products so you can launch the project from within your Studio domain.
 
 [![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/quickcreate?templateUrl=https%3A%2F%2Famazon-sagemaker-safe-deployment-pipeline.s3.amazonaws.com%2Fdrift-pipeline%2Fdrift-service-catalog.yml&stackName=drift-pipeline&param_ExecutionRoleArn=&param_PortfolioName=SageMaker%20Organization%20Templates&param_PortfolioOwner=administrator&param_ProductVersion=1.0)
+
+Follow are the list of the parameters. 
+
+| Parameters         | Description                                    |
+| ------------------ | ---------------------------------------------- |
+| ExecutionRoleArn   | The SageMaker Studio execution role (required) |
+| PortfolioName      | The name of the portfolio                      |
+| PortfolioOwner     | The owner of the portfolio                     |
+| ProductVersion     | The product version to deploy                  |
+
+You can copy the the required `ExecutionRoleArn` role from the Studio dashboard.
+
+![Execution Role](docs/drift-execution-role.png)
 
 Alternatively see [BUILD.md](BUILD.md) for instructions on how to build the MLOps template from source.
 

@@ -1,19 +1,25 @@
 Parameters:
   ExecutionRoleArn:
     Type: String
+    AllowedPattern: ^arn:aws[a-z\-]*:iam::\d{12}:role/?[a-zA-Z_0-9+=,.@\-_/]+$
     Description: The SageMaker Studio execution role
+    MinLength: 1
   PortfolioName:
     Type: String
     Default: SageMaker Organization Templates
     Description: The name of the portfolio
+    MinLength: 1
   PortfolioOwner:
     Type: String
     Default: administrator
-    Description: The owner of the portfolio.
+    Description: The owner of the portfolio
+    MaxLength: 50
+    MinLength: 1
   ProductVersion:
     Type: String
     Default: "1.0"
-    Description: The product version to deploy
+    Description: The product version
+    MinLength: 1
 Resources:
   Portfolio856A4190:
     Type: AWS::ServiceCatalog::Portfolio

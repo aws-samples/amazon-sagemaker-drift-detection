@@ -26,6 +26,8 @@ class ServiceCatalogStack(core.Stack):
             "ExecutionRoleArn",
             type="String",
             description="The SageMaker Studio execution role",
+            min_length=1,
+            allowed_pattern="^arn:aws[a-z\-]*:iam::\d{12}:role/?[a-zA-Z_0-9+=,.@\-_/]+$",
         )
 
         portfolio_name = core.CfnParameter(
@@ -34,14 +36,17 @@ class ServiceCatalogStack(core.Stack):
             type="String",
             description="The name of the portfolio",
             default="SageMaker Organization Templates",
+            min_length=1,
         )
 
         portfolio_owner = core.CfnParameter(
             self,
             "PortfolioOwner",
             type="String",
-            description="The owner of the portfolio.",
+            description="The owner of the portfolio",
             default="administrator",
+            min_length=1,
+            max_length=50,
         )
 
         product_version = core.CfnParameter(
@@ -50,6 +55,7 @@ class ServiceCatalogStack(core.Stack):
             type="String",
             description="The product version to deploy",
             default="1.0",
+            min_length=1,
         )
 
         portfolio = servicecatalog.Portfolio(
