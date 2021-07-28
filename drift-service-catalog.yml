@@ -18,7 +18,7 @@ Parameters:
   ProductVersion:
     Type: String
     Default: "1.0"
-    Description: The product version
+    Description: The product version to deploy
     MinLength: 1
 Resources:
   Portfolio856A4190:
@@ -36,14 +36,6 @@ Resources:
         Ref: Portfolio856A4190
       ProductId:
         Ref: Product896941B4
-  PortfolioPortolioPrincipalAssociationcc6250f4ae96A7A5C798:
-    Type: AWS::ServiceCatalog::PortfolioPrincipalAssociation
-    Properties:
-      PortfolioId:
-        Ref: Portfolio856A4190
-      PrincipalARN:
-        Ref: ExecutionRoleArn
-      PrincipalType: IAM
   Product896941B4:
     Type: AWS::ServiceCatalog::CloudFormationProduct
     Properties:
@@ -225,6 +217,16 @@ Resources:
       PolicyName: LaunchRolePolicyA9E2E5B1
       Roles:
         - AmazonSageMakerServiceCatalogProductsLaunchRole
+  PortfolioPrincipalAssociation:
+    Type: AWS::ServiceCatalog::PortfolioPrincipalAssociation
+    Properties:
+      PortfolioId:
+        Ref: Portfolio856A4190
+      PrincipalARN:
+        Ref: ExecutionRoleArn
+      PrincipalType: IAM
+    DependsOn:
+      - Product896941B4
   LaunchRoleConstraint:
     Type: AWS::ServiceCatalog::LaunchRoleConstraint
     Properties:
@@ -248,6 +250,8 @@ Resources:
             - ":iam::"
             - Ref: AWS::AccountId
             - :role/service-role/AmazonSageMakerServiceCatalogProductsLaunchRole
+    DependsOn:
+      - PortfolioPrincipalAssociation
   CodeCommitSeedBucket94EB6088:
     Type: AWS::SSM::Parameter
     Properties:
