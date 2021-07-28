@@ -116,7 +116,13 @@ Then follow the series of steps in the notebook to run through the sample:
 8. Deploy the model to Production
 9. Make predictions against the Production Endpoint to cause the the Model Monitor to alarm on drift detection.
 
-Once the Model Monitor scheduled has completed its execution (usually about 10 minutes past the hour) you should notice that your model build pipeline is re-training as a results of drift being detected.
+### Model Monitor
+
+To [visualize the results](https://docs.aws.amazon.com/sagemaker/latest/dg/model-monitor-interpreting-visualize-results.html) of Model Monitoring in Amazon SageMaker Studio select the Production Endpoint from the **Components and registries** left navigation pane or from the **Endpoints** tab in the project summary.
+
+![Solution Architecture](docs/drift-model-monitor.png)
+
+Once the Model Monitor **Data Quality** schedule has completed its execution (usually about 10 minutes past the hour) you will be able to navigate to the **Monitoring job history** tab to see that *issue found* will be identified in the **Monitoring status** column.
 
 ## Running Costs
 

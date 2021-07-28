@@ -30,6 +30,52 @@ The full Model Build pipeline outlined above will start on the condition that co
 
 ![EventBridge Drift Rule](../docs/drift-eventbridge-rule.png)
 
+The payload for this event will include the *alarmName* and *reason*.
+
+```
+{
+    "version": "0",
+    "id": "ac2d4fbb-ccaa-4c95-4a82-55a9ff9a6b64",
+    "detail-type": "CloudWatch Alarm State Change",
+    "source": "aws.cloudwatch",
+    "account": "<<account>>",
+    "time": "2021-07-28T07:02:04Z",
+    "region": "<<region>>",
+    "resources": [
+        "arn:aws:cloudwatch:<<region>>:<<account>>:alarm:sagemaker-<<project_name>>-prod-threshold"
+    ],
+    "detail": {
+        "alarmName": "sagemaker-<<project_name>>-prod-threshold",
+        "state": {
+            "value": "ALARM",
+            "reason": "Threshold Crossed: 1 out of the last 1 datapoints [0.85 was greater than the threshold (0.4) (minimum 1 datapoint for OK -> ALARM transition).",
+            "timestamp": "2021-07-28T07:02:04.149+0000"
+        },
+        "configuration": {
+            "description": "Schedule Metric > Threshold",
+            "metrics": [
+                {
+                    "id": "febd7542-28c2-51f2-f869-82db1ccd7ee6",
+                    "metricStat": {
+                        "metric": {
+                            "namespace": "aws/sagemaker/Endpoints/data-metrics",
+                            "name": "feature_baseline_drift_fare_amount",
+                            "dimensions": {
+                                "Endpoint": "sagemaker-<<project_name>>-prod",
+                                "MonitoringSchedule": "sagemaker-<<project_name>>-prod-threshold"
+                            }
+                        },
+                        "period": 3600,
+                        "stat": "Average"
+                    },
+                    "returnData": true
+                }
+            ]
+        }
+    }
+}
+```
+
 When the Model Build pipeline has completed successfully, an AWS CloudWatch event will be published like so:
 
 ```

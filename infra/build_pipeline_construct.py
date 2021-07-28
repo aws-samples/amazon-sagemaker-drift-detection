@@ -253,6 +253,7 @@ class BuildPipelineConstruct(core.Construct):
             )
         )
 
+        # TODO: Add Fix to ensure `detail_type` emits as `detail-type` in CFN
         drift_rule = events.CfnRule(
             self,
             "DriftRule",
