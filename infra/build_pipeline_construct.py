@@ -259,18 +259,19 @@ class BuildPipelineConstruct(core.Construct):
             description="Rule to start SM pipeline when drift has been detected.",
             name=drift_rule_name,
             state="ENABLED",
-            event_pattern=events.EventPattern(
-                source=["aws.cloudwatch"],
-                detail_type=["CloudWatch Alarm State Change"],
-                detail={
+            event_pattern={
+                "source": ["aws.cloudwatch"],
+                "detail-type": ["CloudWatch Alarm State Change"],
+                "detail": {
                     "alarmName": [
                         f"sagemaker-{project_name}-staging-threshold",
                         f"sagemaker-{project_name}-prod-threshold",
                     ],
                     "state": {"value": ["ALARM"]},
                 },
-            ),
+            },
         )
+
         self.add_sagemaker_pipeline_target(
             drift_rule, event_role, sagemaker_pipeline_arn
         )
@@ -379,8 +380,8 @@ class BuildPipelineConstruct(core.Construct):
         rule: events.CfnRule,
         event_role: aws_iam.Role,
         sagemaker_pipeline_arn: str,
-    ):
-        """Use events.CfnRule instead of events.Rule to accomodate
+    ) -> None:
+        """Use events.CfnRule instead of events.Rule to accommodate
         [custom target](https://github.com/aws/aws-cdk/issues/14887)
 
         Args:
