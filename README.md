@@ -47,15 +47,17 @@ On the Create project page, SageMaker templates is chosen by default. This optio
 
 ![Select Template](docs/drift-select-template.png)
 
+`NOTE`: If you have recently updated your AWS Service Catalog Project, you may need to refresh SageMaker Studio to ensure it picks up the latest version of your template.
+
 9. In the **Project details** section, for **Name**, enter **drift-pipeline**.
   - The project name must have 32 characters or fewer.
 10. In the Project template parameters
   - For **RetrainSchedule**, input a validate [Cron Schedule](https://docs.aws.amazon.com/sagemaker/latest/dg/model-monitor-schedule-expression.html) which defaults to `cron(0 12 1 * ? *)` - the first day of every month.
-11. Choose Create project.
+11. Choose **Create project**.
 
 ![Create Project](docs/drift-create-project.png)
 
-`NOTE`: If you have recently updated your AWS Service Catalog Project, you may need to refresh SageMaker Studio to ensure it picks up the latest version of your template.
+`NOTE`: If the **Create project** button is not enabled, touch the value in the **RetrainSchedule** to allow continuing.
 
 ### Project Resources
 
@@ -87,15 +89,22 @@ You will see a summary of these resources in the project page including the Repo
 
 ## Run the Pipeline
 
-Clone the repository the ends with `-build` into Amazon SageMaker Studio, and open the [drift-detection.ipynb](build_pipeline/drift-detection.ipynb) notebook.
+Once your project is created, following the instructions to [Clone the Code Repository](https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-projects-walkthrough.html#sagemaker-proejcts-walkthrough-clone)
 
-Provide the **Project Name** in the first cell to get started:
+![Solution Architecture](docs/drift-clone-repository.png)
+
+1. Choose **Repositories**, and in the **Local path** column for the repository that ends with *build*, choose **clone repo....**
+2. In the dialog box that appears, accept the defaults and choose **Clone repository**
+3. When clone of the repository is complete, the local path appears in the **Local path** column. Click on the path to open the local folder that contains the repository code in SageMaker Studio.
+4. Click on the [drift-detection.ipynb](build_pipeline/drift-detection.ipynb) file to open the notebook.
+
+In the notebook, provide the **Project Name** in the first cell to get started:
 
 ```
 project_name = "<<project_name>>"  # << Update this drift detection project
 ```
 
-Then follow the series of steps in the notebook to:
+Then follow the series of steps in the notebook to run through the sample:
 
 1. Fetch the [NYC Taxi Dataset](https://registry.opendata.aws/nyc-tlc-trip-records-pds/) and upload to S3
 2. Start the model build pipeline
