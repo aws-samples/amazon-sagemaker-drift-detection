@@ -180,13 +180,22 @@ class ServiceCatalogStack(core.Stack):
             role_arn=f"arn:{self.partition}:iam::{self.account}:role/{products_launch_role_name}",
         )
 
-        portfolio.give_access_to_role(
-            iam.Role.from_role_arn(
-                self, "execution_role_arn", role_arn=execution_role_arn.value_as_string
-            )
-        )
+        # portfolio.give_access_to_role(
+        #     iam.Role.from_role_arn(
+        #         self, "execution_role_arn", role_arn=execution_role_arn.value_as_string
+        #     )
+        # )
 
-        servicecatalog.CfnLaunchRoleConstraint(
+        portfolio_association = servicecatalog.CfnPortfolioPrincipalAssociation(
+            self,
+            "PortfolioPrincipalAssociation",
+            portfolio_id=portfolio.portfolio_id,
+            principal_arn=execution_role_arn.value_as_string,
+            principal_type="IAM",
+        )
+        portfolio_association.node.add_dependency(product)
+
+        role_constraint = servicecatalog.CfnLaunchRoleConstraint(
             self,
             "LaunchRoleConstraint",
             portfolio_id=portfolio.portfolio_id,
@@ -194,6 +203,7 @@ class ServiceCatalogStack(core.Stack):
             role_arn=products_launch_role.role_arn,
             description=f"Launch as {products_launch_role.role_arn}",
         )
+        role_constraint.add_depends_on(portfolio_association)
 
         # Create the build and deployment asset as an output to pass to pipeline stack
         build_asset = s3_assets.Asset(self, "BuildAsset", path="./build_pipeline")
