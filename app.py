@@ -13,10 +13,25 @@ logging.basicConfig(level="INFO")
 # Create App and stacks
 app = core.App()
 
+artifact_bucket = app.node.try_get_context("ArtifactBucket")
+
 # Create the pipeline stack
-PipelineStack(app, "drift-pipeline")
+synth = core.DefaultStackSynthesizer()
+if artifact_bucket is not None:
+    synth = core.DefaultStackSynthesizer(
+        file_assets_bucket_name=artifact_bucket,
+        generate_bootstrap_version_rule=False,
+    )
+PipelineStack(app, "drift-pipeline", synthesizer=synth)
 
 # Create the SC stack
-ServiceCatalogStack(app, "drift-service-catalog")
+synth = core.DefaultStackSynthesizer()
+if artifact_bucket is not None:
+    synth = core.DefaultStackSynthesizer(
+        file_assets_bucket_name=artifact_bucket,
+        generate_bootstrap_version_rule=False,
+    )
+
+ServiceCatalogStack(app, "drift-service-catalog", synthesizer=synth)
 
 app.synth()
