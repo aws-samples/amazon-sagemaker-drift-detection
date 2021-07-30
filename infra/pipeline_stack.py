@@ -190,11 +190,6 @@ class PipelineStack(core.Stack):
             # CloudFormation creates models and endpoints
             sagemaker_policy.attach_to_role(cloudformation_role)
 
-        # Define the lambda code for pipeline change
-        lambda_code = lambda_.AssetCode.from_bucket(
-            s3.Bucket.from_bucket_name(self, "SeedBucket", seed_bucket), seed_lambda_key
-        )
-
         # Define an environment object to pass to build
         env = core.Environment(account=self.account, region=self.region)
 
@@ -213,7 +208,6 @@ class PipelineStack(core.Stack):
             event_role=event_role,
             lambda_role=lambda_role,
             s3_artifact=s3_artifact,
-            lambda_code=lambda_code,
             branch_name=branch_name,
             project_id=project_id.value_as_string,
             project_name=project_name.value_as_string,

@@ -5,14 +5,10 @@ import json
 import os
 import logging
 
-# Get environment variables
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 
-# Configure logging
 logger = logging.getLogger()
 logger.setLevel(LOG_LEVEL)
-
-
 config = Config(retries={"max_attempts": 10, "mode": "standard"})
 codepipeline = boto3.client("codepipeline", config=config)
 sm_client = boto3.client("sagemaker")
@@ -49,7 +45,6 @@ def check_pipeline(job_id, pipeline_name, pipeline_execution_arn=None):
                 f"SageMaker Pipeline arn: {pipeline_execution_arn} {pipeline_execution_status}"
             )
             if pipeline_execution_status in ["Failed", "Stopped"]:
-                # Set to failure if Failed or Stopped
                 result = {
                     "type": "JobFailed",
                     "message": f"Pipeline Status is {pipeline_execution_status}",
@@ -58,7 +53,6 @@ def check_pipeline(job_id, pipeline_name, pipeline_execution_arn=None):
                 codepipeline.put_job_failure_result(jobId=job_id, failureDetails=result)
                 return 400, result
             elif pipeline_execution_status in ["Executing", "Succeeded"]:
-                # Set to success if Executing or Succeeded
                 result = {
                     "Status": pipeline_execution_status,
                     "PipelineExecutionArn": pipeline_execution_arn,
@@ -67,7 +61,6 @@ def check_pipeline(job_id, pipeline_name, pipeline_execution_arn=None):
                     jobId=job_id, outputVariables=result
                 )
                 return 200, result
-        # Update status to pending passing continuation token
         logger.info(f"Continuing code pipeline job: {job_id}")
         codepipeline.put_job_success_result(
             jobId=job_id,
@@ -75,8 +68,6 @@ def check_pipeline(job_id, pipeline_name, pipeline_execution_arn=None):
         )
         return 202, {"PipelineExecutionArn": pipeline_execution_arn}
     except ClientError as e:
-        logger.error(e)
-        # Get boto3 specific error message
         error_code = e.response["Error"]["Code"]
         error_message = e.response["Error"]["Message"]
         result = {
@@ -94,22 +85,13 @@ def check_pipeline(job_id, pipeline_name, pipeline_execution_arn=None):
 
 def lambda_handler(event, context):
     logger.debug(json.dumps(event))
-
-    # Get the code pipeline job id and data
     job_id = event["CodePipeline.job"]["id"]
     job_data = event["CodePipeline.job"]["data"]
-    # Get the pipeline name from the user parameters
     user_parameters = job_data["actionConfiguration"]["configuration"]["UserParameters"]
     pipeline_name = json.loads(user_parameters)["PipelineName"]
-    # Check if we have a continuation token
+    pipeline_execution_arn = None
     if "continuationToken" in job_data:
         pipeline_execution_arn = job_data["continuationToken"]
-    else:
-        pipeline_execution_arn = None
-
-    # Return the status to check the pipeline
     status_code, result = check_pipeline(job_id, pipeline_name, pipeline_execution_arn)
-
-    # Log result succesful result and return
     logger.debug(json.dumps(result))
     return {"statusCode": status_code, "body": json.dumps(result)}
