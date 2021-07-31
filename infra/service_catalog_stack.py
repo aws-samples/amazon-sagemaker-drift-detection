@@ -27,7 +27,7 @@ class ServiceCatalogStack(core.Stack):
             type="String",
             description="The SageMaker Studio execution role",
             min_length=1,
-            allowed_pattern="^arn:aws[a-z\-]*:iam::\d{12}:role/?[a-zA-Z_0-9+=,.@\-_/]+$",
+            allowed_pattern="^arn:aws[a-z\\-]*:iam::\\d{12}:role/?[a-zA-Z_0-9+=,.@\\-_/]+$",
         )
 
         portfolio_name = core.CfnParameter(

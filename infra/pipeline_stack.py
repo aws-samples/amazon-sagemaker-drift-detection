@@ -1,7 +1,6 @@
 from aws_cdk import (
     core,
     aws_iam as iam,
-    aws_lambda as lambda_,
     aws_s3 as s3,
 )
 
@@ -50,7 +49,6 @@ class PipelineStack(core.Stack):
         seed_bucket = self.resolve_ssm_parameter("CodeCommitSeedBucket")
         seed_build_key = self.resolve_ssm_parameter("CodeCommitBuildKey")
         seed_deploy_key = self.resolve_ssm_parameter("CodeCommitDeployKey")
-        seed_lambda_key = self.resolve_ssm_parameter("LambdaKey")
 
         # Create the s3 artifact (name must be < 63 chars)
         s3_artifact = s3.Bucket(
