@@ -6,8 +6,8 @@ from aws_cdk import (
     aws_codepipeline_actions as codepipeline_actions,
     aws_events as events,
     aws_events_targets as targets,
-    aws_iam,
-    aws_lambda,
+    aws_iam as iam,
+    aws_lambda as lambda_,
     aws_s3 as s3,
 )
 
@@ -22,14 +22,13 @@ class BuildPipelineConstruct(core.Construct):
         scope: core.Construct,
         construct_id: str,
         env: core.Environment,
-        sagemaker_execution_role: aws_iam.Role,
-        code_pipeline_role: aws_iam.Role,
-        code_build_role: aws_iam.Role,
-        cloudformation_role: aws_iam.Role,
-        event_role: aws_iam.Role,
-        lambda_role: aws_iam.Role,
+        sagemaker_execution_role: iam.Role,
+        code_pipeline_role: iam.Role,
+        code_build_role: iam.Role,
+        cloudformation_role: iam.Role,
+        event_role: iam.Role,
+        lambda_role: iam.Role,
         s3_artifact: s3.Bucket,
-        lambda_code: aws_lambda.AssetCode,
         branch_name: str,
         project_name: str,
         project_id: str,
@@ -77,7 +76,7 @@ class BuildPipelineConstruct(core.Construct):
 
         # It seems the code build job requires  permissions to CreateBucket, despite the fact this exists
         code_build_role.add_to_policy(
-            aws_iam.PolicyStatement(
+            iam.PolicyStatement(
                 actions=["s3:CreateBucket"],
                 resources=[s3_artifact.bucket_arn],
             )
@@ -147,16 +146,18 @@ class BuildPipelineConstruct(core.Construct):
             ),
         )
 
-        # Define step to run the lambda pipeline
-        # see: https://github.com/aws/aws-cdk/issues/14887
-        lambda_start_pipeline = aws_lambda.Function(
+        # Load the start pipeline code
+        with open("lambda/build/lambda_start_pipeline.py", encoding="utf8") as fp:
+            lambda_start_pipeline_code = fp.read()
+
+        lambda_start_pipeline = lambda_.Function(
             self,
             "StartPipelineFunction",
             function_name=f"sagemaker-{project_name}-start-pipeline",
-            code=lambda_code,
+            code=lambda_.Code.from_inline(lambda_start_pipeline_code),
             role=lambda_role,
-            handler="lambda_start_pipeline.lambda_handler",
-            runtime=aws_lambda.Runtime.PYTHON_3_8,
+            handler="index.lambda_handler",
+            runtime=lambda_.Runtime.PYTHON_3_8,
             timeout=core.Duration.seconds(3),
             memory_size=128,
             environment={
@@ -166,7 +167,7 @@ class BuildPipelineConstruct(core.Construct):
         )
 
         # Add permissions to start pipeline for lambda and event role
-        start_pipeline_policy = aws_iam.PolicyStatement(
+        start_pipeline_policy = iam.PolicyStatement(
             actions=[
                 "sagemaker:DescribePipelineExecution",
                 "sagemaker:StartPipelineExecution",
@@ -247,7 +248,7 @@ class BuildPipelineConstruct(core.Construct):
         # Allow event role to start pipeline and code pipeline
         event_role.add_to_policy(start_pipeline_policy)
         event_role.add_to_policy(
-            aws_iam.PolicyStatement(
+            iam.PolicyStatement(
                 actions=["codepipeline:StartPipelineExecution"],
                 resources=[code_pipeline.pipeline_arn],
             )
@@ -289,14 +290,18 @@ class BuildPipelineConstruct(core.Construct):
             schedule_rule, event_role, sagemaker_pipeline_arn
         )
 
-        lambda_pipeline_change = aws_lambda.Function(
+        # Load the lambda pipeline change code
+        with open("lambda/build/lambda_pipeline_change.py", encoding="utf8") as fp:
+            lambda_pipeline_change_code = fp.read()
+
+        lambda_pipeline_change = lambda_.Function(
             self,
             "PipelineChangeFunction",
             function_name=f"sagemaker-{project_name}-pipeline-change",
-            code=lambda_code,
+            code=lambda_.Code.from_inline(lambda_pipeline_change_code),
             role=lambda_role,
-            handler="lambda_pipeline_change.lambda_handler",
-            runtime=aws_lambda.Runtime.PYTHON_3_8,
+            handler="index.lambda_handler",
+            runtime=lambda_.Runtime.PYTHON_3_8,
             timeout=core.Duration.seconds(3),
             memory_size=128,
             environment={
@@ -310,7 +315,7 @@ class BuildPipelineConstruct(core.Construct):
         # Add permissions to put job status (if we want to call this directly within CodePipeline)
         # see: https://docs.aws.amazon.com/codepipeline/latest/userguide/approvals-iam-permissions.html
         lambda_pipeline_change.add_to_role_policy(
-            aws_iam.PolicyStatement(
+            iam.PolicyStatement(
                 actions=[
                     "codepipeline:EnableStageTransition",
                     "codepipeline:DisableStageTransition",
@@ -320,7 +325,7 @@ class BuildPipelineConstruct(core.Construct):
         )
 
         lambda_pipeline_change.add_to_role_policy(
-            aws_iam.PolicyStatement(
+            iam.PolicyStatement(
                 actions=[
                     "events:EnableRule",
                     "events:DisableRule",
@@ -379,7 +384,7 @@ class BuildPipelineConstruct(core.Construct):
     def add_sagemaker_pipeline_target(
         self,
         rule: events.CfnRule,
-        event_role: aws_iam.Role,
+        event_role: iam.Role,
         sagemaker_pipeline_arn: str,
     ) -> None:
         """Use events.CfnRule instead of events.Rule to accommodate
@@ -387,7 +392,7 @@ class BuildPipelineConstruct(core.Construct):
 
         Args:
             rule (events.IRule): The event rule to add Target
-            event_role (aws_iam.Role): The event role
+            event_role (iam.Role): The event role
             sagemaker_pipeline_arn (str): The SageMaker Pipeline ARN
         """
         sagemaker_pipeline_target = {
