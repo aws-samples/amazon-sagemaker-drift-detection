@@ -21,7 +21,6 @@ jobs:
         with:
           python-version: "3.8" # Version range or exact version of a Python version to use, using SemVer's version range syntax
           architecture: "x64" # optional x64 or x86. Defaults to x64 if not specified
-          cache: python
 
       - name: Setup Node 
         uses: actions/setup-node@v2
@@ -31,8 +30,9 @@ jobs:
           cache: npm
                     
       - name: Install Requirements
-        run: npm install -g aws-cdk # Install cdk
-        run: pip install --requirement requirements.txt
+        run: | 
+          npm install -g aws-cdk # Install cdk
+          pip install --requirement requirements.txt
 
       - name: Configure AWS credentials
         id: creds
@@ -44,22 +44,24 @@ jobs:
           role-duration-seconds: 1200
 
       - name: Synth Template
-        id: data_prep
         env:
           BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
           BUCKET_PREFIX: ${{ secrets.BUCKET_PREFIX }}
-        run: rm -Rf cdk.out/ 
         run: cdk synth drift-service-catalog --path-metadata false -c drift:ArtifactBucket=$BUCKET_NAME -c drift:ArtifactBucketPrefix=$BUCKET_PREFIX > drift-service-catalog.yml
 
-      - name: Publish Assets
-        run: # cd cdk.out; for d in asset.*/ ; do base=$(basename "$d") ; cd $base ; zip -r $base.zip * ; mv "${base}.zip" .. ; cd .. ; done; cd ..
-        run: # aws s3 sync cdk.out/*.zip s3://amazon-sagemaker-safe-deployment-pipeline/drift/ --acl public-read
+      - name: Publish Assets to S3
+        env:
+          BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
+          BUCKET_PREFIX: ${{ secrets.BUCKET_PREFIX }}
+        run: python infra/upload_assets.py
+
+      - name: Upload  Template
+        uses: actions/upload-artifact@v2
+        with:
+          name: cdk-template
+          path: cdk.out/*.template.json
 
       - name: Print Template
         run: cat drift-service-catalog.yml
 
-      - name: Upload Template
-        uses: actions/upload-artifact@v2
-        with:
-          name: drift-service-catalog
-          path: drift-service-catalog.yml
+
