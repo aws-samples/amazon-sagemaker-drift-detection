@@ -4,7 +4,7 @@
     "instance_type": "ml.t2.large",
     "auto_scaling": {
         "min_capacity": 2,
-        "max_capacity": 10
+        "max_capacity": 4
     },
     "schedule_config": {
         "data_capture_sampling_percentage": 100,
