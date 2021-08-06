@@ -134,7 +134,7 @@ This section outlines cost considerations for running the Drift Detection Pipeli
 - **SageMaker** – Prices vary based on EC2 instance usage for the Notebook Instances, Model Hosting, Model Training and Model Monitoring; each charged per hour of use. For more information, see [Amazon SageMaker Pricing](https://aws.amazon.com/sagemaker/pricing/).
   - The three `mml.m5.xlarge` *baseline, training and evaluation jobs* run for approx 20 minutes at $0.23 an hour, and cost less than $1.
   - The one `ml.t2.medium` instance for staging *hosting* endpoint costs $0.056 per hour, or $1.34 per day.
-  - The two `ml.t2.large` instances for production *hosting* endpoint at 2 x $0.111 per hour, or $5.33 per day.
+  - The two `ml.m5.large` instances for production *hosting* endpoint at 2 x $0.115 per hour, or $5.52 per day.
   - The one `ml.m5.xlarge` instance for *model monitor* schedule at $0.23 an hour, and cost less than $1 per day.
 - **S3** – Low cost, prices will vary depending on the size of the models/artifacts stored. The first 50 TB each month will cost only $0.023 per GB stored. For more information, see [Amazon S3 Pricing](https://aws.amazon.com/s3/pricing/).
 - **Lambda** - Low cost, $0.20 per 1 million request see [AWS Lambda Pricing](https://aws.amazon.com/lambda/pricing/).
