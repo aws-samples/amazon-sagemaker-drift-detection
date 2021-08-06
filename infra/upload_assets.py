@@ -55,7 +55,16 @@ def zip_filter(filename: str) -> bool:
     Returns:
         bool: True if should filter
     """
-    return os.path.isfile(filename) and filename not in [".DS_Store"]
+    dir_name = os.path.basename(os.path.dirname(filename))
+    base_name = os.path.basename(filename)
+    return (
+        os.path.isfile(filename)
+        and base_name not in [".DS_Store"]
+        and not dir_name == "cdk.out"
+        and not dir_name == "__pycache__"
+        and not filename.endswith(".pyc")
+        and not dir_name.endswith(".egg-info")
+    )
 
 
 def make_zipfile(source_dir: str) -> str:
@@ -68,16 +77,12 @@ def make_zipfile(source_dir: str) -> str:
         str: Returns the zip filename created
     """
     output_filename = source_dir + ".zip"
-    relroot = os.path.abspath(os.path.join(source_dir, os.pardir))
     with zipfile.ZipFile(output_filename, "w", zipfile.ZIP_DEFLATED) as zip:
         for root, dirs, files in os.walk(source_dir):
-            # add directory (needed for empty dirs)
-            zip.write(root, os.path.relpath(root, relroot))
             for file in files:
                 filename = os.path.join(root, file)
                 if zip_filter(filename):
-                    arcname = os.path.join(os.path.relpath(root, relroot), file)
-                    # print(root, arcname)
+                    arcname = os.path.join(os.path.relpath(root, source_dir), file)
                     zip.write(filename, arcname)
     return output_filename
 
