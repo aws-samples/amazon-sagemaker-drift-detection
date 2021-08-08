@@ -58,6 +58,7 @@ class PipelineStack(core.Stack):
                 project_id.value_as_string, self.region
             ),
             removal_policy=core.RemovalPolicy.DESTROY,
+            auto_delete_objects=True
         )
 
         core.CfnOutput(self, "ArtifactBucket", value=s3_artifact.bucket_name)
