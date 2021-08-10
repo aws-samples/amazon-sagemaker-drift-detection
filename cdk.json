@@ -14,6 +14,6 @@
     "drift:CodeCommitSeedBucket": "/drift-pipeline/CodeCommitSeedBucket",
     "drift:CodeCommitBuildKey": "/drift-pipeline/CodeCommitBuildKey",
     "drift:CodeCommitDeployKey": "/drift-pipeline/CodeCommitDeployKey",
-    "drift:LambdaKey": "/drift-pipeline/LambdaKey"
+    "drift:CodeCommitDemoKey": "/drift-pipeline/CodeCommitDemoKey"
   }
 }
