@@ -2,6 +2,7 @@ from aws_cdk import (
     core,
     aws_iam as iam,
     aws_s3 as s3,
+    aws_codecommit as codecommit
 )
 
 from infra.build_pipeline_construct import BuildPipelineConstruct
@@ -49,6 +50,7 @@ class PipelineStack(core.Stack):
         seed_bucket = self.resolve_ssm_parameter("CodeCommitSeedBucket")
         seed_build_key = self.resolve_ssm_parameter("CodeCommitBuildKey")
         seed_deploy_key = self.resolve_ssm_parameter("CodeCommitDeployKey")
+        seed_demo_key = self.resolve_ssm_parameter("CodeCommitDemoKey")
 
         # Create the s3 artifact (name must be < 63 chars)
         s3_artifact = s3.Bucket(
@@ -58,7 +60,7 @@ class PipelineStack(core.Stack):
                 project_id.value_as_string, self.region
             ),
             removal_policy=core.RemovalPolicy.DESTROY,
-            auto_delete_objects=True
+            # auto_delete_objects=True
         )
 
         core.CfnOutput(self, "ArtifactBucket", value=s3_artifact.bucket_name)
@@ -231,6 +233,28 @@ class PipelineStack(core.Stack):
             seed_bucket=seed_bucket,
             seed_key=seed_deploy_key,
         )
+
+        # Create source repo from seed bucket/key
+        repo = codecommit.CfnRepository(
+            self,
+            "CodeRepoDemo",
+            repository_name="sagemaker-{}-{}".format(project_name.value_as_string, construct_id),
+            repository_description=f"Amazon SageMaker Drift {construct_id} pipeline",
+            code=codecommit.CfnRepository.CodeProperty(
+                s3=codecommit.CfnRepository.S3Property(
+                    bucket=seed_bucket,
+                    key=seed_demo_key,
+                    object_version=None,
+                ),
+                branch_name=branch_name,
+            ),
+            tags=[
+                core.CfnTag(key="sagemaker:project-id", value=project_id.value_as_string),
+                core.CfnTag(key="sagemaker:project-name", value=project_name.value_as_string),
+            ],
+        )
+
+
 
     def resolve_ssm_parameter(self, key: str):
         parameter_name = self.node.try_get_context(f"drift:{key}")
