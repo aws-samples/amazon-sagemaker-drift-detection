@@ -5,6 +5,7 @@ from aws_cdk import (
 )
 
 from infra.build_pipeline_construct import BuildPipelineConstruct
+from infra.batch_pipeline_construct import BatchPipelineConstruct
 from infra.deploy_pipeline_construct import DeployPipelineConstruct
 
 
@@ -34,13 +35,22 @@ class PipelineStack(core.Stack):
             max_length=16,
             description="Service generated Id of the project.",
         )
+        # TODO: Add deployment option of real-time/batch/both
+        batch_schedule = core.CfnParameter(
+            self,
+            "BatchSchedule",
+            type="String",
+            description="The expression to batch schedule.  Defaults to every day.",
+            default="day(1 day)",  # TODO: Make cron
+            min_length=1,
+        )
         # Require a schedule parameter (must be cron, otherwise will trigger every time rate is enabled/disabled)
         # https://docs.aws.amazon.com/AmazonCloudWatch/latest/events/ScheduledEvents.html
         retrain_schedule = core.CfnParameter(
             self,
             "RetrainSchedule",
             type="String",
-            description="The optional expression to retrain schedule.  Defaults to first day of the month.",
+            description="The expression to retrain schedule.  Defaults to first day of the month.",
             default="cron(0 12 1 * ? *)",
             min_length=1,
         )
@@ -48,6 +58,7 @@ class PipelineStack(core.Stack):
         # Get drift-pipeline parameters
         seed_bucket = self.resolve_ssm_parameter("CodeCommitSeedBucket")
         seed_build_key = self.resolve_ssm_parameter("CodeCommitBuildKey")
+        seed_batch_key = self.resolve_ssm_parameter("CodeCommitBatchKey")
         seed_deploy_key = self.resolve_ssm_parameter("CodeCommitDeployKey")
 
         # Create the s3 artifact (name must be < 63 chars)
@@ -212,6 +223,26 @@ class PipelineStack(core.Stack):
             seed_bucket=seed_bucket,
             seed_key=seed_build_key,
             retrain_schedule=retrain_schedule.value_as_string,
+        )
+
+        # Set the build pipeline
+        self.batch_pipeline = BatchPipelineConstruct(
+            self,
+            "batch",
+            env=env,
+            sagemaker_execution_role=sagemaker_execution_role,
+            code_pipeline_role=code_pipeline_role,
+            code_build_role=code_build_role,
+            cloudformation_role=cloudformation_role,
+            event_role=event_role,
+            lambda_role=lambda_role,
+            s3_artifact=s3_artifact,
+            branch_name=branch_name,
+            project_id=project_id.value_as_string,
+            project_name=project_name.value_as_string,
+            seed_bucket=seed_bucket,
+            seed_key=seed_batch_key,
+            batch_schedule=batch_schedule.value_as_string,
         )
 
         # Set the build pipeline

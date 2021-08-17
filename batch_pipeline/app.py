@@ -8,31 +8,71 @@ import os
 from pipelines.pipeline import get_pipeline, upload_pipeline
 
 from aws_cdk import core
+from infra.batch_config import BatchConfig
 from infra.sagemaker_pipeline_stack import SageMakerPipelineStack
+from infra.model_registry import ModelRegistry
+
 
 # Configure the logger
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"))
 
 
+registry = ModelRegistry()
+
+
 def main(
     project_name,
     project_id,
     region,
+    stage_name: str,
     sagemaker_pipeline_name,
     sagemaker_pipeline_description,
     sagemaker_pipeline_role,
+    lambda_header_arn,
+    lambda_execution_role,
     artifact_bucket,
     output_dir,
 ):
-    # Use project_name for pipeline and model package group name
-    model_package_group_name = project_name
+    # Get the stage specific deployment config for sagemaker
+    with open(f"{stage_name}-config.json", "r") as f:
+        j = json.load(f)
+        batch_config = BatchConfig(**j)
+
+    # Set the model package group to project name
+    package_group_name = project_name
+
+    # If we don't have a specific champion variant defined, get the latest approved
+    if batch_config.model_package_version is None:
+        logger.info("Selecting latest approved")
+        p = registry.get_latest_approved_packages(package_group_name, max_results=1)[0]
+        batch_config.model_package_version = p["ModelPackageVersion"]
+        batch_config.model_package_arn = p["ModelPackageArn"]
+    else:
+        # Get the versioned package and update ARN
+        logger.info(f"Selecting variant version {batch_config.model_package_version}")
+        p = registry.get_versioned_approved_packages(
+            package_group_name,
+            model_package_versions=[batch_config.model_package_version],
+        )[0]
+        batch_config.model_package_arn = p["ModelPackageArn"]
+
+    # Get the pipeline execution to get the baseline uri, for passing into
+    pipeline_execution_arn = registry.get_pipeline_execution_arn(
+        batch_config.model_package_arn
+    )
+    baseline_uri = registry.get_processing_output(pipeline_execution_arn)
+    logger.info(f"Got baseline uri: {baseline_uri}")
+
+    # Create batch pipeline
     pipeline = get_pipeline(
         region=region,
         role=sagemaker_pipeline_role,
         default_bucket=artifact_bucket,
-        model_package_group_name=model_package_group_name,
         pipeline_name=sagemaker_pipeline_name,
+        baseline_uri=baseline_uri,
+        lambda_header_arn=lambda_header_arn,
+        lambda_execution_role=lambda_execution_role,
         base_job_prefix=project_id,
     )
 
@@ -41,7 +81,7 @@ def main(
         os.mkdir(output_dir)
 
     # Create the pipeline definition
-    logger.info("Creating/updating a SageMaker Pipeline")
+    logger.info("Creating/updating a SageMaker Pipeline for batch transform")
     pipeline_definition_body = pipeline.definition()
     parsed = json.loads(pipeline_definition_body)
     logger.debug(json.dumps(parsed, indent=2, sort_keys=True))
@@ -51,7 +91,7 @@ def main(
     pipeline_location = upload_pipeline(
         pipeline,
         default_bucket=artifact_bucket,
-        base_job_prefix=f"{project_id}/build",
+        base_job_prefix=f"{project_id}/batch",
     )
 
     # Store parameters as template-config.json used in the next CodePipeline step to create the SageMakerPipelineStack.
@@ -69,11 +109,9 @@ def main(
 
     SageMakerPipelineStack(
         app,
-        "drift-sagemaker-pipeline",
-        model_package_group_name=model_package_group_name,
+        "drift-batch-pipeline",
         pipeline_name=sagemaker_pipeline_name,
         pipeline_description=sagemaker_pipeline_description,
-        # pipeline_definition_body=pipeline_definition_body,
         role_arn=sagemaker_pipeline_role,
         tags=tags,
     )
@@ -100,6 +138,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--sagemaker-pipeline-role",
         default=os.environ.get("SAGEMAKER_PIPELINE_ROLE_ARN"),
+    )
+    parser.add_argument(
+        "--lambda-header-arn",
+        default=os.environ.get("LAMBDA_HEADER_ARN"),
+    )
+    parser.add_argument(
+        "--lambda-execution-role",
+        default=os.environ.get("LAMBDA_EXECUTION_ROLE_ARN"),
     )
     parser.add_argument(
         "--artifact-bucket",

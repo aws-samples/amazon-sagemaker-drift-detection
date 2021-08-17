@@ -6,9 +6,9 @@ with open("README.md") as fp:
 
 
 setuptools.setup(
-    name="amazon_sagemaker_drift_detection_deploy_pipeline",
+    name="amazon_sagemaker_drift_detection_deployment_pipeline",
     version="0.0.1",
-    description="Amazon SageMaker Drift Detection Deploy pipeline",
+    description="Amazon SageMaker Drift Detection Deployment pipeline",
     long_description=long_description,
     long_description_content_type="text/markdown",
     author="amazon",

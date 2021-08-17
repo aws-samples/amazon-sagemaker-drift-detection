@@ -207,10 +207,12 @@ class ServiceCatalogStack(core.Stack):
 
         # Create the build and deployment asset as an output to pass to pipeline stack
         build_asset = s3_assets.Asset(self, "BuildAsset", path="./build_pipeline")
+        batch_asset = s3_assets.Asset(self, "BatchAsset", path="./batch_pipeline")
         deploy_asset = s3_assets.Asset(
             self, "DeployAsset", path="./deployment_pipeline"
         )
         build_asset.grant_read(grantee=products_launch_role)
+        batch_asset.grant_read(grantee=products_launch_role)
         deploy_asset.grant_read(grantee=products_launch_role)
 
         # Output the deployment bucket and key, for input into pipeline stack
@@ -219,6 +221,9 @@ class ServiceCatalogStack(core.Stack):
         )
         self.export_ssm(
             "CodeCommitBuildKey", build_asset.s3_object_key, products_launch_role
+        )
+        self.export_ssm(
+            "CodeCommitBatchKey", batch_asset.s3_object_key, products_launch_role
         )
         self.export_ssm(
             "CodeCommitDeployKey", deploy_asset.s3_object_key, products_launch_role

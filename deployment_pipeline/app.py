@@ -14,7 +14,6 @@ from infra.model_registry import ModelRegistry
 logger = logging.getLogger(__name__)
 logging.basicConfig(level="INFO")
 
-# TODO: Move registry code out of SageMaker Stack and into here
 registry = ModelRegistry()
 
 
