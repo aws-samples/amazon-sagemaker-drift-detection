@@ -46,7 +46,7 @@ Resources:
         - DisableTemplateValidation: false
           Info:
             LoadTemplateFromURL:
-              Fn::Sub: https://s3.${AWS::Region}.${AWS::URLSuffix}/amazon-sagemaker-safe-deployment-pipeline/drift/995c5412ab943fce18ceaf3ebe66d305f8ab054a4a3f643768722c3fead226a0.json
+              Fn::Sub: https://s3.${AWS::Region}.${AWS::URLSuffix}/amazon-sagemaker-safe-deployment-pipeline/drift-pipeline/bb5d48cd7945c426367bc6e4c68bddbe49e843cd1675417a43612ecf57c74db9.json
           Name:
             Ref: ProductVersion
       Description: Amazon SageMaker Project for a build and deployment pipeline that triggers on drift or schedule
@@ -243,18 +243,18 @@ Resources:
     Type: AWS::SSM::Parameter
     Properties:
       Type: String
-      Value: drift/be4dfed42e0626f2201f8ce29518fb4e31fb640eca88a156fedc5b8d568c6c1c.zip
+      Value: drift-pipeline/d297faa65fa51491492d4cacebf1defed72b187c02365def3b69229387498bb7.zip
       Name: /drift-pipeline/CodeCommitBuildKey
   CodeCommitDeployKey5E5A6E47:
     Type: AWS::SSM::Parameter
     Properties:
       Type: String
-      Value: drift/381262eab49cfaf013c17daf9216232c25761d7f0ec33583681b6b699adf4ecf.zip
+      Value: drift-pipeline/3a795f940d89cbb6df0f6b41f06788a8c809f09b6254b151eeec3cdcbe7426c8.zip
       Name: /drift-pipeline/CodeCommitDeployKey
   CDKMetadata:
     Type: AWS::CDK::Metadata
     Properties:
-      Analytics: v2:deflate64:H4sIAAAAAAAAE3WQwU7EMAxEv2XvaXar5cARthKnPVTlCyzX7Zq2MUoc0Krqv5O0SBQJTvEkk3kal7YsH+zp8ASfocB2OM4onuz8qoCDqTpXg4eJlLx5DoE03ffselOJC+ojqmkoSPRI2byfk6NlZXGLydlzIP/BSAgKo/R2rsVrJyPLSvlT1F7ahEhgQYacZapRYvsiflrlt2HF/fewS2OH/A7jr7zOXSE6vDUy0lYK2OliwrmAXDjYtXfS9hJxIL1AIMMw5QYj431j5Cl9ClNeXQL1P3vbL3FZFlPf9SbueLaPtjwd3gJz4aNTnsg22/kFLKE7OZUBAAA=
+      Analytics: v2:deflate64:H4sIAAAAAAAAE3WQwWrEMAxEv2XvjnfDQumx3UBPewjpFwhFyapJrGLLLUvIv9dOCk2hPVljj+cxKm1ZPtjT4Qk+Q4HtcJxRPNn5VQEHU3WuBg8TKXnzHAJpuu/Z9aYSF9RHVNNQkOiRsnk/J0fLyuIWk7PnQP6DkRAURuntXIvXTkaWlfKnqL20CZHAggw5y1SjxPZF/LTKb8OK++9hl8YO+R3GX3mdu0J0eGtkpK0UsNPFhHMBuXCwa++k7SXiQHqBQIZhyg1GxvvGyFP6FKa8ugTqf/a2X+KyLKa+603c8WwfbXk6vAXmwkenPJFttvMLHtBBNZUBAAA=
     Condition: CDKMetadataAvailable
 Conditions:
   CDKMetadataAvailable:

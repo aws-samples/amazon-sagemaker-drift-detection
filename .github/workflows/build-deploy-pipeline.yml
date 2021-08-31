@@ -1,0 +1,255 @@
+# Create a unified Build and Deploy pipeline that uses approval gates
+# Build Model –> Deploy to staging with approval –> Deploy to prod with approval.
+# https://timheuer.com/blog/add-approval-workflow-to-github-actions/
+
+name: Build and Deploy
+
+on: [push, pull_request] # Optionally filter on branch
+
+jobs:
+  build:
+    name: Build Model
+    runs-on: ubuntu-latest
+    environment:
+      name: development
+    defaults:
+      run:
+        shell: bash
+        working-directory: ./build_pipeline
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Config Environment
+        id: env-name
+        env:
+          PROJECT_NAME: ${{ github.event.repository.name }}
+        run: |
+          echo "Project name: $PROJECT_NAME"
+          echo "::set-output name=project_name::$PROJECT_NAME"
+
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: "3.8"
+          architecture: "x64"
+
+      - name: Setup Node
+        uses: actions/setup-node@v2
+        with:
+          node-version: "12"
+          architecture: "x64"
+          cache: npm
+
+      - name: Install Requirements
+        run: |
+          npm install -g aws-cdk # Install cdk
+          pip install --requirement requirements.txt
+
+      - name: Configure AWS Credentials
+        id: creds
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_SAGEMAKER_ROLE }}
+          role-duration-seconds: 1200
+
+      - name: Build Pipeline
+        id: build-pipeline
+        env:
+          SAGEMAKER_PROJECT_NAME: ${{ steps.env-name.outputs.project_name }}
+          SAGEMAKER_PIPELINE_NAME: ${{ steps.env-name.outputs.project_name }}-pipeline
+          SAGEMAKER_PIPELINE_DESCRIPTION: "SageMaker pipeline created from GitHub actions"
+          SAGEMAKER_PIPELINE_ROLE_ARN: ${{ secrets.AWS_SAGEMAKER_ROLE }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          export SAGEMAKER_PROJECT_ID=`aws sagemaker describe-project --project-name $SAGEMAKER_PROJECT_NAME --query ProjectId --output text`
+          echo "Project id: $SAGEMAKER_PROJECT_ID"
+          export ARTIFACT_BUCKET=sagemaker-project-$SAGEMAKER_PROJECT_ID-$AWS_REGION
+          echo "Artifact Bucket: $ARTIFACT_BUCKET"
+          npx cdk synth --path-metadata false --asset-metadata=false > drift-pipeline.yml
+          echo "::set-output name=pipeline_name::$SAGEMAKER_PIPELINE_NAME"
+
+      - name: Print template
+        run: cat drift-pipeline.yml
+
+      - name: Create CFN Pipeline
+        id: deploy-pipeline
+        uses: aws-actions/aws-cloudformation-github-deploy@v1
+        with:
+          name: sagemaker-${{ steps.build-pipeline.outputs.pipeline_name }}
+          template: ./build_pipeline/drift-pipeline.yml # Need to specify working-directory
+          no-fail-on-empty-changeset: "1"
+
+      - name: Start Pipeline
+        id: start-pipeline # TODO: Run python code that waits for pipeline to complete
+        run: aws sagemaker start-pipeline-execution --pipeline-name ${{ steps.build-pipeline.outputs.pipeline_name }} --pipeline-parameters Name=InputSource,Value=GitHubAction#${{ github.run_number }}
+
+      - name: Upload template
+        uses: actions/upload-artifact@v2
+        with:
+          name: drift-pipeline
+          path: ./build_pipeline/drift-pipeline.yml
+
+  deploy_staging:
+    needs: build
+    name: Deploy to staging
+    runs-on: ubuntu-latest
+    environment:
+      name: staging # Use different environment that optionally requires approval
+    defaults:
+      run:
+        shell: bash
+        working-directory: ./deployment_pipeline
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Config Environment
+        id: env-name
+        env:
+          PROJECT_NAME: ${{ github.event.repository.name }}
+        run: |
+          echo "Project name: $PROJECT_NAME"
+          echo "::set-output name=project_name::$PROJECT_NAME"
+
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: "3.8"
+          architecture: "x64"
+
+      - name: Setup Node
+        uses: actions/setup-node@v2
+        with:
+          node-version: "12"
+          architecture: "x64"
+          cache: npm
+
+      - name: Install Requirements
+        run: |
+          npm install -g aws-cdk # Install cdk
+          pip install --requirement requirements.txt
+
+      - name: Configure AWS Credentials
+        id: creds
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_SAGEMAKER_ROLE }}
+          role-duration-seconds: 1200
+
+      - name: Build Templates
+        id: build-templates
+        env:
+          SAGEMAKER_PROJECT_NAME: ${{ steps.env-name.outputs.project_name }}
+          SAGEMAKER_EXECUTION_ROLE_ARN: ${{ secrets.AWS_SAGEMAKER_ROLE }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          export SAGEMAKER_PROJECT_ID=`aws sagemaker describe-project --project-name $SAGEMAKER_PROJECT_NAME --query ProjectId --output text`
+          echo "Project id: $SAGEMAKER_PROJECT_ID"
+          export ARTIFACT_BUCKET=sagemaker-project-$SAGEMAKER_PROJECT_ID-$AWS_REGION
+          echo "Artifact Bucket: $ARTIFACT_BUCKET"
+          npx cdk synth drift-deploy-staging --path-metadata false --asset-metadata=false > drift-deploy-staging.yml
+
+      - name: Print template
+        run: cat drift-deploy-staging.yml
+
+      - name: Deploy Staging
+        id: deploy-pipeline
+        uses: aws-actions/aws-cloudformation-github-deploy@v1
+        with:
+          name: sagemaker-${{ steps.env-name.outputs.project_name }}-deploy-staging
+          template: ./deployment_pipeline/drift-deploy-staging.yml # Need to specify working-directory
+          no-fail-on-empty-changeset: "1"
+
+      - name: Upload template
+        uses: actions/upload-artifact@v2
+        with:
+          name: drift-deploy-staging
+          path: ./deployment_pipeline/drift-deploy-staging.yml
+
+  deploy_prod:
+    needs: deploy_staging
+    name: Deploy to prod
+    if: ${{ github.ref == 'refs/heads/main' }} # Filter to only run on main branch
+    runs-on: ubuntu-latest
+    environment:
+      name: prod # Use different environment that requires approval
+    defaults:
+      run:
+        shell: bash
+        working-directory: ./deployment_pipeline
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Config Environment
+        id: env-name
+        env:
+          PROJECT_NAME: ${{ github.event.repository.name }}
+        run: |
+          echo "Project name: $PROJECT_NAME"
+          echo "::set-output name=project_name::$PROJECT_NAME"
+
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: "3.8"
+          architecture: "x64"
+
+      - name: Setup Node
+        uses: actions/setup-node@v2
+        with:
+          node-version: "12"
+          architecture: "x64"
+          cache: npm
+
+      - name: Install Requirements
+        run: |
+          npm install -g aws-cdk # Install cdk
+          pip install --requirement requirements.txt
+
+      - name: Configure AWS Credentials
+        id: creds
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_SAGEMAKER_ROLE }}
+          role-duration-seconds: 1200
+
+      - name: Build Templates
+        id: build-templates
+        env:
+          SAGEMAKER_PROJECT_NAME: ${{ steps.env-name.outputs.project_name }}
+          SAGEMAKER_EXECUTION_ROLE_ARN: ${{ secrets.AWS_SAGEMAKER_ROLE }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          export SAGEMAKER_PROJECT_ID=`aws sagemaker describe-project --project-name $SAGEMAKER_PROJECT_NAME --query ProjectId --output text`
+          echo "Project id: $SAGEMAKER_PROJECT_ID"
+          export ARTIFACT_BUCKET=sagemaker-project-$SAGEMAKER_PROJECT_ID-$AWS_REGION
+          echo "Artifact Bucket: $ARTIFACT_BUCKET"
+          npx cdk synth drift-deploy-prod --path-metadata false --asset-metadata=false > drift-deploy-prod.yml
+
+      - name: Print Template
+        run: cat drift-deploy-prod.yml
+
+      - name: Deploy Prod
+        id: deploy-pipeline
+        uses: aws-actions/aws-cloudformation-github-deploy@v1
+        with:
+          name: sagemaker-${{ steps.env-name.outputs.project_name }}-deploy-prod
+          template: ./deployment_pipeline/drift-deploy-prod.yml # Need to specify working-directory
+          no-fail-on-empty-changeset: "1"
+
+      - name: Upload template
+        uses: actions/upload-artifact@v2
+        with:
+          name: drift-deploy-prod
+          path: ./deployment_pipeline/drift-deploy-prod.yml

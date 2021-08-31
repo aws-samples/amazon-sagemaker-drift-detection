@@ -121,7 +121,7 @@ if __name__ == "__main__":
     logger.addHandler(ch)
     logger.info(f"Uploading assets for git ref: {GITHUB_REF} sha: {GITHUB_SHA}")
     # Upload YAML template
-    template_name = "drift-service-catalog.yml"
+    template_name = "cloudformation/drift-service-catalog.yml"
     object_key = f"{BUCKET_PREFIX}{template_name}"
     upload_file(template_name, BUCKET_NAME, object_key, "application/x-yaml")
     # Upload assets

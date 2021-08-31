@@ -114,7 +114,6 @@ class BuildPipelineConstruct(core.Construct):
                         "base-directory": "dist",
                         "files": [
                             "pipeline.json",
-                            "template-config.json",
                             "*.template.json",
                         ],
                     },
@@ -223,9 +222,6 @@ class BuildPipelineConstruct(core.Construct):
                             run_order=1,
                             template_path=pipeline_build_output.at_path(
                                 "drift-sagemaker-pipeline.template.json"
-                            ),
-                            template_configuration=pipeline_build_output.at_path(
-                                "template-config.json"
                             ),
                             stack_name="sagemaker-{}-pipeline".format(project_name),
                             admin_permissions=False,
