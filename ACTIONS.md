@@ -25,7 +25,7 @@ aws cloudformation deploy \
   --capabilities CAPABILITY_NAMED_IAM \
   --region us-east-1
 ```
-You can review the permissions that your repository's GitHub Actions deployment workflow will have in the [setup.yml](cloudformation-templates/setup.yml) CloudFormation template.
+You can review the permissions that your repository's GitHub Actions deployment workflow will have in the [github-actions-setup.yml](cloudformation/github-actions-setup.yml) CloudFormation template.
 
 Retrieve the IAM access key credentials that GitHub Actions will use for deployments:
 ```
