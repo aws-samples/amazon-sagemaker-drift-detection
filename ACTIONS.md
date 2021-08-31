@@ -5,10 +5,12 @@ This template repository contains a sample application and sample GitHub Actions
 This MLOps workflow demonstrates training and evaluating a machine learning model to predict taxi fare from the public [New York City Taxi dataset](https://registry.opendata.aws/nyc-tlc-trip-records-pds/) deployed with Amazon SageMaker. 
 
 This repository contains a number of start workflow files for GitHub Actions:
-1. [build-pipeline.yml](./build-pipeline.yml) runs when a pull request is opened or updated.  This workflow creates or updates the Sagemaker Pipeline, and starts an execution.
-1. [deploy-staging.yml](./deploy-staging.yml) runs when a new commit is pushed to the master branch for the `staging` environment.  This workflow deploys the SageMaker endpoint for staging. (WIP)
-1. [deploy-prod.yml](./deploy-prod.yml) runs when a new commit is pushed to the master branch for the `production` environment.  This workflow deploys the Sagemaker endpoint for production. (WIP)
-1. [publish-template.yml](./publish-template.yml) runs when a new commit is pushed to the master branch for the `public` environment.  Synths and uploads the CFN templates and build & deploy assets for launching the stack. 
+1. [build-deploy-pipeline.yml](.github/workflows/build-deploy-pipeline.yml) This workflow runs when a pull request is opened or commit with the following stages:
+  * `build`: This workflow creates or updates the Sagemaker Pipeline, and starts an execution in the `development` environment.
+  * `deploy_staging`: This workflow deploys the SageMaker endpoint in the `staging` environment.
+  * `deploy_prod`: This workflow deploys the SageMaker endpoint with Model Monitor in the `prod` environment.
+1. [publish-template.yml](.github/workflows/publish-template.yml) runs when a new commit is pushed to the main branch in the `aws` environment:
+  * Synths and uploads the CFN templates and build & deploy assets for launching the stack.
 
 ## Create a GitHub repository from this template
 
