@@ -154,6 +154,8 @@ def get_pipeline(
         instance_type=transform_instance_type,
         instance_count=transform_instance_count,
         base_transform_job_name=f"{base_job_prefix}/transform",
+        assemble_with="Line",
+        accept="text/csv",
         output_path=output_transform_uri,
         sagemaker_session=sagemaker_session,
     )
@@ -161,7 +163,14 @@ def get_pipeline(
     step_transform = TransformStep(
         name="TransformModel",
         transformer=transformer,
-        inputs=TransformInput(data=input_data_uri),
+        inputs=TransformInput(
+            data=input_data_uri,
+            content_type="text/csv",
+            split_type="Line",
+            input_filter="$[1:]",
+            join_source="Input",
+            output_filter="$[1:]",
+        ),
     )
 
     # Declare the header to append to output
