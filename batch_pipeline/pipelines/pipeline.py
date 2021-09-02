@@ -14,36 +14,23 @@ import boto3
 import sagemaker
 import sagemaker.session
 
-from sagemaker.inputs import CreateModelInput, TransformInput
-from sagemaker.model import Model
 from sagemaker.model_monitor.dataset_format import DatasetFormat
 from sagemaker.processing import (
     ProcessingInput,
     ProcessingOutput,
     Processor,
+    ScriptProcessor,
 )
 from sagemaker.s3 import S3Uploader
-
-# from sagemaker.workflow.conditions import ConditionLessThanOrEqualTo
-# from sagemaker.workflow.condition_step import (
-#     ConditionStep,
-#     JsonGet,
-# )
 from sagemaker.workflow.parameters import (
     ParameterInteger,
     ParameterString,
 )
 from sagemaker.workflow.pipeline import Pipeline
-from sagemaker.workflow.properties import PropertyFile
 from sagemaker.workflow.steps import (
-    CreateModelStep,
-    TransformStep,
     ProcessingStep,
     CacheConfig,
 )
-from sagemaker.workflow.lambda_step import LambdaStep, LambdaOutput
-from sagemaker.lambda_helper import Lambda
-from sagemaker.transformer import Transformer
 from sagemaker.utils import name_from_base
 
 
@@ -77,8 +64,6 @@ def get_pipeline(
     pipeline_name,
     baseline_uri,
     model_uri,
-    lambda_header_arn,
-    lambda_execution_role,
     default_bucket,
     base_job_prefix,
 ) -> Pipeline:
@@ -135,71 +120,36 @@ def get_pipeline(
         py_version="py3",
         instance_type=transform_instance_type,
     )
-    model = Model(
+
+    # processing step for evaluation
+    script_eval = ScriptProcessor(
         image_uri=image_uri_inference,
-        model_data=input_model_uri,
+        command=["python3"],
+        instance_count=transform_instance_count,
+        instance_type=transform_instance_type,
+        base_job_name=f"{base_job_prefix}/script-score",
         sagemaker_session=sagemaker_session,
         role=role,
     )
 
-    inputs_model = CreateModelInput(instance_type=transform_instance_type)
-
-    step_create_model = CreateModelStep(
-        name="CreateModel", model=model, inputs=inputs_model
-    )
-
-    # Create the batch transformer
-    transformer = Transformer(
-        model_name=step_create_model.properties.ModelName,
-        instance_type=transform_instance_type,
-        instance_count=transform_instance_count,
-        base_transform_job_name=f"{base_job_prefix}/transform",
-        assemble_with="Line",
-        accept="text/csv",
-        output_path=output_transform_uri,
-        sagemaker_session=sagemaker_session,
-    )
-
-    step_transform = TransformStep(
-        name="TransformModel",
-        transformer=transformer,
-        inputs=TransformInput(
-            data=input_data_uri,
-            content_type="text/csv",
-            split_type="Line",
-            input_filter="$[1:]",
-            join_source="Input",
-            output_filter="$[1:]",
-        ),
-    )
-
-    # Declare the header to append to output
-    header = [
-        "passenger_count",
-        "pickup_latitude",
-        "pickup_longitude",
-        "dropoff_latitude",
-        "dropoff_longitude",
-        "geo_distance",
-        "hour",
-        "weekday",
-        "month",
-    ]
-
-    # TODO: Modify the add header step to enumerate files in output, and then create new ones in
-
-    # Add lambda step to add header to transform output
-    step_lambda_add_header = LambdaStep(
-        name="AddHeaderLambda",
-        lambda_func=Lambda(
-            function_arn=lambda_header_arn,
-            execution_role_arn=lambda_execution_role,
-        ),
-        inputs={
-            "TransformOutputUri": step_transform.properties.TransformOutput.S3OutputPath,
-            "Header": ",".join(header),
-        },
-        outputs=[LambdaOutput(output_name="S3OutputPath")],
+    step_score = ProcessingStep(
+        name="ScoreModel",
+        processor=script_eval,
+        inputs=[
+            ProcessingInput(
+                source=input_model_uri,
+                destination="/opt/ml/processing/model",
+            ),
+            ProcessingInput(
+                source=input_data_uri,
+                destination="/opt/ml/processing/input",
+            ),
+        ],
+        outputs=[
+            ProcessingOutput(output_name="scores", source="/opt/ml/processing/output"),
+        ],
+        code=os.path.join(BASE_DIR, "score.py"),
+        cache_config=cache_config,
     )
 
     # Get the default model monitor container
@@ -234,7 +184,9 @@ def get_pipeline(
         processor=monitor_analyzer,
         inputs=[
             ProcessingInput(
-                source=step_lambda_add_header.properties.Outputs["S3OutputPath"],
+                source=step_score.properties.ProcessingOutputConfig.Outputs[
+                    "scores"
+                ].S3Output.S3Uri,
                 destination="/opt/ml/processing/input/baseline_dataset_input",
                 input_name="baseline_dataset_input",
             ),
@@ -259,24 +211,6 @@ def get_pipeline(
         cache_config=cache_config,
     )
 
-    # TODO: Try and read the output of constraints json for model monitor?
-
-    # # condition step for evaluating model quality and branching execution
-    # cond_lte = ConditionLessThanOrEqualTo(
-    #     left=JsonGet(
-    #         step=step_eval,
-    #         property_file=evaluation_report,
-    #         json_path="regression_metrics.rmse.value",
-    #     ),
-    #     right=7.0,
-    # )
-    # step_cond = ConditionStep(
-    #     name="CheckEvaluation",
-    #     conditions=[cond_lte],
-    #     if_steps=[step_register],
-    #     else_steps=[],
-    # )
-
     # pipeline instance
     pipeline = Pipeline(
         name=pipeline_name,
@@ -290,7 +224,7 @@ def get_pipeline(
             output_transform_uri,
             output_monitor_uri,
         ],
-        steps=[step_create_model, step_transform, step_lambda_add_header, step_monitor],
+        steps=[step_score, step_monitor],
         sagemaker_session=sagemaker_session,
     )
 

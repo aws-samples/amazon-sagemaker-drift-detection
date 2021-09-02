@@ -68,12 +68,10 @@ def main(
     pipeline = get_pipeline(
         region=region,
         role=sagemaker_pipeline_role,
-        default_bucket=artifact_bucket,
         pipeline_name=sagemaker_pipeline_name,
         baseline_uri=baseline_uri,
         model_uri=model_uri,
-        lambda_header_arn=lambda_header_arn,
-        lambda_execution_role=lambda_execution_role,
+        default_bucket=artifact_bucket,
         base_job_prefix=project_id,
     )
 

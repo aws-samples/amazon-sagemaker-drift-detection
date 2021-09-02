@@ -81,25 +81,6 @@ class BatchPipelineConstruct(core.Construct):
             )
         )
 
-        # Load the start pipeline code
-        with open("lambda/batch/lambda_add_header.py", encoding="utf8") as fp:
-            lambda_add_header_code = fp.read()
-
-        lambda_add_header = lambda_.Function(
-            self,
-            "AddHeaderFunction",
-            function_name=f"sagemaker-{project_name}-add-header",
-            code=lambda_.Code.from_inline(lambda_add_header_code),
-            role=lambda_role,
-            handler="index.lambda_handler",
-            runtime=lambda_.Runtime.PYTHON_3_8,
-            timeout=core.Duration.seconds(3),
-            memory_size=128,
-            environment={
-                "LOG_LEVEL": "INFO",
-            },
-        )
-
         # Define AWS CodeBuild spec to run node.js and python
         # https://docs.aws.amazon.com/codebuild/latest/userguide/available-runtimes.html
         pipeline_build = codebuild.PipelineProject(
@@ -155,12 +136,6 @@ class BatchPipelineConstruct(core.Construct):
                     ),
                     "SAGEMAKER_PIPELINE_ROLE_ARN": codebuild.BuildEnvironmentVariable(
                         value=sagemaker_execution_role.role_arn,
-                    ),
-                    "LAMBDA_HEADER_ARN": codebuild.BuildEnvironmentVariable(
-                        value=lambda_add_header.function_arn,
-                    ),
-                    "LAMBDA_EXECUTION_ROLE_ARN": codebuild.BuildEnvironmentVariable(
-                        value=lambda_role.role_arn,
                     ),
                     "ARTIFACT_BUCKET": codebuild.BuildEnvironmentVariable(
                         value=s3_artifact.bucket_name
