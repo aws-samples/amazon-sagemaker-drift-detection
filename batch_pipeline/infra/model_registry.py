@@ -217,13 +217,42 @@ class ModelRegistry:
             "MetadataProperties"
         ]["GeneratedBy"]
 
+    def get_model_artifact(
+        self,
+        pipeline_execution_arn: str,
+        step_name: str = "TrainModel",
+    ):
+        """Returns the training job model artifact uri for a given step name.
+
+        Args:
+            pipeline_execution_arn: The pipeline execution arn
+            step_name: The optional training job step name
+
+        Returns:
+            The model artifact from the training job
+        """
+
+        steps = self.sm_client.list_pipeline_execution_steps(
+            PipelineExecutionArn=pipeline_execution_arn
+        )["PipelineExecutionSteps"]
+        training_job_arn = [
+            s["Metadata"]["TrainingJob"]["Arn"]
+            for s in steps
+            if s["StepName"] == step_name
+        ][0]
+        training_job_name = training_job_arn.split("/")[-1]
+        outputs = self.sm_client.describe_training_job(
+            TrainingJobName=training_job_name
+        )
+        return outputs["ModelArtifacts"]["S3ModelArtifacts"]
+
     def get_processing_output(
         self,
         pipeline_execution_arn: str,
         step_name: str = "BaselineJob",
         output_name: str = "monitoring_output",
     ):
-        """Filters the model packages based on a list of model package verisons.
+        """Returns a processing job output uri for a given step and output name.
 
         Args:
             pipeline_execution_arn: The pipeline execution arn
@@ -231,7 +260,7 @@ class ModelRegistry:
             output_name: The output value to pick from the processing job
 
         Returns:
-            The outputs from the processing job
+            The output from the processing job
         """
 
         steps = self.sm_client.list_pipeline_execution_steps(

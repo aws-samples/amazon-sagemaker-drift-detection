@@ -35,23 +35,22 @@ class PipelineStack(core.Stack):
             max_length=16,
             description="Service generated Id of the project.",
         )
-        # TODO: Add deployment option of real-time/batch/both
+        # Require a schedule parameter (must be cron, otherwise will trigger every time rate is enabled/disabled)
+        # https://docs.aws.amazon.com/AmazonCloudWatch/latest/events/ScheduledEvents.html
         batch_schedule = core.CfnParameter(
             self,
             "BatchSchedule",
             type="String",
             description="The expression to batch schedule.  Defaults to every day.",
-            default="day(1 day)",  # TODO: Make cron
+            default="cron(0 12 * * ? *)",  # Every day at 12am
             min_length=1,
         )
-        # Require a schedule parameter (must be cron, otherwise will trigger every time rate is enabled/disabled)
-        # https://docs.aws.amazon.com/AmazonCloudWatch/latest/events/ScheduledEvents.html
         retrain_schedule = core.CfnParameter(
             self,
             "RetrainSchedule",
             type="String",
             description="The expression to retrain schedule.  Defaults to first day of the month.",
-            default="cron(0 12 1 * ? *)",
+            default="cron(0 12 1 * ? *)",  # 1st of the month at 12am
             min_length=1,
         )
 

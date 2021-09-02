@@ -119,6 +119,7 @@ class BatchPipelineConstruct(core.Construct):
                             "commands": [
                                 "npm install aws-cdk",
                                 "npm update",
+                                "python -m pip install --upgrade pip",
                                 "python -m pip install -r requirements.txt",
                             ],
                         },
@@ -131,8 +132,6 @@ class BatchPipelineConstruct(core.Construct):
                     artifacts={
                         "base-directory": "dist",
                         "files": [
-                            "pipeline.json",
-                            "template-config.json",
                             "*.template.json",
                         ],
                     },
@@ -216,19 +215,16 @@ class BatchPipelineConstruct(core.Construct):
                             action_name="Create_CFN_Pipeline",
                             run_order=1,
                             template_path=pipeline_build_output.at_path(
-                                "drift-sagemaker-pipeline.template.json"
+                                "drift-batch-pipeline.template.json"
                             ),
-                            template_configuration=pipeline_build_output.at_path(
-                                "template-config.json"
-                            ),
-                            stack_name="sagemaker-{}-pipeline".format(project_name),
+                            stack_name=f"sagemaker-{project_name}-batch",
                             admin_permissions=False,
                             deployment_role=cloudformation_role,
                             replace_on_failure=True,
                             role=code_pipeline_role,
                         ),
                     ],
-                ),
+                ),  # TODO: Add approval and production batch
             ],
         )
 
@@ -292,6 +288,7 @@ class BatchPipelineConstruct(core.Construct):
                 "RuleList": [schedule_rule_name],
             }
         )
+
         # Rule to enable/disable rules when start/stop of sagemaker pipeline
         events.Rule(
             self,
@@ -313,7 +310,43 @@ class BatchPipelineConstruct(core.Construct):
                 },
                 resources=[sagemaker_pipeline_arn],
             ),
-            targets=[targets.LambdaFunction(lambda_pipeline_change, event_payload)],
+            targets=[
+                targets.LambdaFunction(lambda_pipeline_change, event=event_payload)
+            ],
+        )
+
+        # Allow event role to start code pipeline
+        event_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=["codepipeline:StartPipelineExecution"],
+                resources=[code_pipeline.pipeline_arn],
+            )
+        )
+
+        # Add deploy role to target the code pipeline when model package is approved
+        events.Rule(
+            self,
+            "ModelRegistryRule",
+            rule_name="sagemaker-{}-modelregistry-{}".format(
+                project_name, construct_id
+            ),
+            description="Rule to trigger a deployment when SageMaker Model registry is updated with a new model package.",
+            event_pattern=events.EventPattern(
+                source=["aws.sagemaker"],
+                detail_type=["SageMaker Model Package State Change"],
+                detail={
+                    "ModelPackageGroupName": [
+                        project_name,
+                    ],
+                    "ModelApprovalStatus": [
+                        "Approved",
+                        "Rejected",
+                    ],
+                },
+            ),
+            targets=[
+                targets.CodePipeline(pipeline=code_pipeline, event_role=event_role)
+            ],
         )
 
         events.Rule(

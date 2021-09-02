@@ -1,5 +1,0 @@
-{
-    "stage_name": "dev",
-    "instance_count": 1,
-    "instance_type": "ml.t2.medium"
-}

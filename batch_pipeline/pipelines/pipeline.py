@@ -41,7 +41,7 @@ from sagemaker.workflow.steps import (
     ProcessingStep,
     CacheConfig,
 )
-from sagemaker.workflow.lambda_step import LambdaStep
+from sagemaker.workflow.lambda_step import LambdaStep, LambdaOutput
 from sagemaker.lambda_helper import Lambda
 from sagemaker.transformer import Transformer
 from sagemaker.utils import name_from_base
@@ -76,11 +76,12 @@ def get_pipeline(
     role,
     pipeline_name,
     baseline_uri,
+    model_uri,
     lambda_header_arn,
     lambda_execution_role,
     default_bucket,
     base_job_prefix,
-):
+) -> Pipeline:
     """Gets a SageMaker ML Pipeline instance working with on nyc taxi data.
     Args:
         region: AWS region to create and run the pipeline.
@@ -100,6 +101,7 @@ def get_pipeline(
     )
     input_model_uri = ParameterString(
         name="ModelUri",
+        default_value=model_uri,
     )
     transform_instance_count = ParameterInteger(
         name="TransformInstanceCount", default_value=1
@@ -113,8 +115,12 @@ def get_pipeline(
     monitor_instance_type = ParameterString(
         name="MonitorInstanceType", default_value="ml.m5.xlarge"
     )
-    monitor_output = ParameterString(
-        name="OutputReportingUri",
+    output_transform_uri = ParameterString(
+        name="TransformOutputUri",
+        default_value=f"s3://{default_bucket}/{base_job_prefix}/transform/",
+    )
+    output_monitor_uri = ParameterString(
+        name="MonitorOutputUri",
         default_value=f"s3://{default_bucket}/{base_job_prefix}/reporting/",
     )
 
@@ -139,7 +145,7 @@ def get_pipeline(
     inputs_model = CreateModelInput(instance_type=transform_instance_type)
 
     step_create_model = CreateModelStep(
-        name="TF2WorkflowCreateModel", model=model, inputs=inputs_model
+        name="CreateModel", model=model, inputs=inputs_model
     )
 
     # Create the batch transformer
@@ -148,13 +154,12 @@ def get_pipeline(
         instance_type=transform_instance_type,
         instance_count=transform_instance_count,
         base_transform_job_name=f"{base_job_prefix}/transform",
-        # output_path=transform_output,
+        output_path=output_transform_uri,
         sagemaker_session=sagemaker_session,
-        role=role,
     )
 
     step_transform = TransformStep(
-        name="AbaloneTransform",
+        name="TransformModel",
         transformer=transformer,
         inputs=TransformInput(data=input_data_uri),
     )
@@ -172,6 +177,8 @@ def get_pipeline(
         "month",
     ]
 
+    # TODO: Modify the add header step to enumerate files in output, and then create new ones in
+
     # Add lambda step to add header to transform output
     step_lambda_add_header = LambdaStep(
         name="AddHeaderLambda",
@@ -181,10 +188,9 @@ def get_pipeline(
         ),
         inputs={
             "TransformOutputUri": step_transform.properties.TransformOutput.S3OutputPath,
-            "FileName": "test.csv",  #
             "Header": ",".join(header),
         },
-        outputs=["S3OutputPath"],
+        outputs=[LambdaOutput(output_name="S3OutputPath")],
     )
 
     # Get the default model monitor container
@@ -209,7 +215,6 @@ def get_pipeline(
         instance_count=monitor_instance_count,
         instance_type=monitor_instance_type,
         base_job_name=f"{base_job_prefix}/monitoring",
-        output_path=monitor_output,
         sagemaker_session=sagemaker_session,
         max_runtime_in_seconds=1800,
         env=env,
@@ -220,7 +225,7 @@ def get_pipeline(
         processor=monitor_analyzer,
         inputs=[
             ProcessingInput(
-                source=step_lambda_add_header.properties.S3OutputPath,
+                source=step_lambda_add_header.properties.Outputs["S3OutputPath"],
                 destination="/opt/ml/processing/input/baseline_dataset_input",
                 input_name="baseline_dataset_input",
             ),
@@ -238,7 +243,7 @@ def get_pipeline(
         outputs=[
             ProcessingOutput(
                 source="/opt/ml/processing/output",
-                destination=monitor_output,  # Use specific output?
+                destination=output_monitor_uri,
                 output_name="monitoring_output",
             ),
         ],
@@ -273,7 +278,8 @@ def get_pipeline(
             transform_instance_type,
             monitor_instance_count,
             monitor_instance_type,
-            monitor_output,
+            output_transform_uri,
+            output_monitor_uri,
         ],
         steps=[step_create_model, step_transform, step_lambda_add_header, step_monitor],
         sagemaker_session=sagemaker_session,
@@ -282,16 +288,12 @@ def get_pipeline(
     return pipeline
 
 
-def upload_pipeline(pipeline: Pipeline, default_bucket, base_job_prefix):
+def upload_pipeline(pipeline: Pipeline, default_bucket, base_job_prefix) -> str:
     # Get the pipeline definition
     pipeline_definition_body = pipeline.definition()
     # Upload the pipeline to a unique location in s3 based on git commit and timestamp
-    pipeline_name = name_from_base(f"{base_job_prefix}/pipeline")
+    pipeline_key = f"{name_from_base(base_job_prefix)}/pipeline.json"
     S3Uploader.upload_string_as_file_body(
-        pipeline_definition_body, f"s3://{default_bucket}/{pipeline_name}.json"
+        pipeline_definition_body, f"s3://{default_bucket}/{pipeline_key}"
     )
-    # Return JSON with parameters used in Cfn Stack creation as template-configuration.json
-    return {
-        "PipelineDefinitionBucket": default_bucket,
-        "PipelineDefinitionKey": f"{pipeline_name}.json",
-    }
+    return pipeline_key

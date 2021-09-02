@@ -22,20 +22,18 @@ registry = ModelRegistry()
 
 
 def main(
-    project_name,
-    project_id,
-    region,
-    stage_name: str,
-    sagemaker_pipeline_name,
-    sagemaker_pipeline_description,
-    sagemaker_pipeline_role,
-    lambda_header_arn,
-    lambda_execution_role,
-    artifact_bucket,
-    output_dir,
+    project_name: str,
+    project_id: str,
+    region: str,
+    sagemaker_pipeline_name: str,
+    sagemaker_pipeline_description: str,
+    sagemaker_pipeline_role: str,
+    lambda_header_arn: str,
+    lambda_execution_role: str,
+    artifact_bucket: str,
 ):
     # Get the stage specific deployment config for sagemaker
-    with open(f"{stage_name}-config.json", "r") as f:
+    with open("batch-config.json", "r") as f:
         j = json.load(f)
         batch_config = BatchConfig(**j)
 
@@ -57,12 +55,14 @@ def main(
         )[0]
         batch_config.model_package_arn = p["ModelPackageArn"]
 
-    # Get the pipeline execution to get the baseline uri, for passing into
+    # # Get the pipeline execution to get the baseline uri, for passing into
     pipeline_execution_arn = registry.get_pipeline_execution_arn(
         batch_config.model_package_arn
     )
     baseline_uri = registry.get_processing_output(pipeline_execution_arn)
     logger.info(f"Got baseline uri: {baseline_uri}")
+    model_uri = registry.get_model_artifact(pipeline_execution_arn)
+    logger.info(f"Got model uri: {model_uri}")
 
     # Create batch pipeline
     pipeline = get_pipeline(
@@ -71,33 +71,26 @@ def main(
         default_bucket=artifact_bucket,
         pipeline_name=sagemaker_pipeline_name,
         baseline_uri=baseline_uri,
+        model_uri=model_uri,
         lambda_header_arn=lambda_header_arn,
         lambda_execution_role=lambda_execution_role,
         base_job_prefix=project_id,
     )
 
-    # Create output directory
-    if not os.path.exists(output_dir):
-        os.mkdir(output_dir)
-
     # Create the pipeline definition
     logger.info("Creating/updating a SageMaker Pipeline for batch transform")
     pipeline_definition_body = pipeline.definition()
     parsed = json.loads(pipeline_definition_body)
-    logger.debug(json.dumps(parsed, indent=2, sort_keys=True))
+    logger.info(json.dumps(parsed, indent=2, sort_keys=True))
 
     # Upload the pipeline to S3 bucket/key and return JSON with key/value for for Cfn Stack parameters.
     # see: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-sagemaker-pipeline.html
-    pipeline_location = upload_pipeline(
+    print(f"Uploading pipeline to {artifact_bucket}")
+    pipeline_definition_key = upload_pipeline(
         pipeline,
         default_bucket=artifact_bucket,
         base_job_prefix=f"{project_id}/batch",
     )
-
-    # Store parameters as template-config.json used in the next CodePipeline step to create the SageMakerPipelineStack.
-    with open(os.path.join(output_dir, "template-config.json"), "w") as f:
-        template_configuration = {"Parameters": pipeline_location}
-        json.dump(template_configuration, f)
 
     # Create App and stacks
     app = core.App()
@@ -112,9 +105,13 @@ def main(
         "drift-batch-pipeline",
         pipeline_name=sagemaker_pipeline_name,
         pipeline_description=sagemaker_pipeline_description,
+        pipeline_definition_bucket=artifact_bucket,
+        pipeline_definition_key=pipeline_definition_key,
         role_arn=sagemaker_pipeline_role,
         tags=tags,
     )
+
+    # TODO: Add prod pipeline
 
     app.synth()
 
@@ -151,7 +148,6 @@ if __name__ == "__main__":
         "--artifact-bucket",
         default=os.environ.get("ARTIFACT_BUCKET"),
     )
-    parser.add_argument("--output-dir", default="dist")
     args = vars(parser.parse_args())
-    print("args: {}".format(args))
+    logger.info("args: {}".format(args))
     main(**args)

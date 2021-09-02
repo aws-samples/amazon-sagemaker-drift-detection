@@ -31,8 +31,9 @@ class BatchConfig:
         self.stage_name = stage_name
         self.instance_count = instance_count
         self.instance_type = instance_type
+        self.model_package_version = model_package_version
+        self.model_package_arn = model_package_arn
         if type(drift_config) is dict:
             self.drift_config = DriftConfig(**drift_config)
         else:
             self.drift_config = None
-        super().__init__(instance_count, instance_type)
