@@ -14,6 +14,8 @@ import boto3
 import sagemaker
 import sagemaker.session
 
+from sagemaker.inputs import CreateModelInput
+from sagemaker.model import Model
 from sagemaker.model_monitor.dataset_format import DatasetFormat
 from sagemaker.processing import (
     ProcessingInput,
@@ -22,12 +24,15 @@ from sagemaker.processing import (
     ScriptProcessor,
 )
 from sagemaker.s3 import S3Uploader
+from sagemaker.workflow.conditions import ConditionEquals
+from sagemaker.workflow.condition_step import ConditionStep
 from sagemaker.workflow.parameters import (
     ParameterInteger,
     ParameterString,
 )
 from sagemaker.workflow.pipeline import Pipeline
 from sagemaker.workflow.steps import (
+    CreateModelStep,
     ProcessingStep,
     CacheConfig,
 )
@@ -59,22 +64,25 @@ def get_session(region, default_bucket):
 
 
 def get_pipeline(
-    region,
-    role,
-    pipeline_name,
-    baseline_uri,
-    model_uri,
-    default_bucket,
-    base_job_prefix,
+    region: str,
+    role: str,
+    pipeline_name: str,
+    default_bucket: str,
+    base_job_prefix: str,
+    data_uri: str,
+    model_uri: str,
+    baseline_uri: str = None,
+    reporting_uri: str = None,
 ) -> Pipeline:
     """Gets a SageMaker ML Pipeline instance working with on nyc taxi data.
     Args:
         region: AWS region to create and run the pipeline.
         role: IAM role to create and run steps and pipeline.
-        default_bucket: the bucket to use for storing the artifacts
         pipeline_name: the bucket to use for storing the artifacts
-        model_package_group_name: the model package group name
+        default_bucket: the bucket to use for storing the artifacts
         base_job_prefix: the prefix to include after the bucket
+        model_uri: model uri
+        baseline_uri: optional baseline uri for drift detection
     Returns:
         an instance of a pipeline
     """
@@ -82,11 +90,16 @@ def get_pipeline(
 
     # parameters for pipeline execution
     input_data_uri = ParameterString(
-        name="DataUri",
+        name="DataInputUri",
+        default_value=data_uri,
     )
     input_model_uri = ParameterString(
-        name="ModelUri",
+        name="ModelInputUri",
         default_value=model_uri,
+    )
+    output_transform_uri = ParameterString(
+        name="TransformOutputUri",
+        default_value=f"s3://{default_bucket}/{base_job_prefix}/transform/",
     )
     transform_instance_count = ParameterInteger(
         name="TransformInstanceCount", default_value=1
@@ -100,14 +113,6 @@ def get_pipeline(
     monitor_instance_type = ParameterString(
         name="MonitorInstanceType", default_value="ml.m5.xlarge"
     )
-    output_transform_uri = ParameterString(
-        name="TransformOutputUri",
-        default_value=f"s3://{default_bucket}/{base_job_prefix}/transform/",
-    )
-    output_monitor_uri = ParameterString(
-        name="MonitorOutputUri",
-        default_value=f"s3://{default_bucket}/{base_job_prefix}/reporting/",
-    )
 
     # Create cache configuration (Unable to pass parameter for expire_after value)
     cache_config = CacheConfig(enable_caching=True, expire_after="PT1H")
@@ -119,6 +124,19 @@ def get_pipeline(
         version="1.2-2",
         py_version="py3",
         instance_type=transform_instance_type,
+    )
+
+    model = Model(
+        image_uri=image_uri_inference,
+        model_data=input_model_uri,
+        sagemaker_session=sagemaker_session,
+        role=role,
+    )
+
+    inputs_model = CreateModelInput(instance_type=transform_instance_type)
+
+    step_create_model = CreateModelStep(
+        name="CreateModel", model=model, inputs=inputs_model
     )
 
     # processing step for evaluation
@@ -151,65 +169,71 @@ def get_pipeline(
         code=os.path.join(BASE_DIR, "score.py"),
         cache_config=cache_config,
     )
+    step_score.add_depends_on([step_create_model])
 
-    # Get the default model monitor container
-    model_monitor_container_uri = sagemaker.image_uris.retrieve(
-        framework="model-monitor",
-        region=region,
-        version="latest",
-    )
+    steps = [step_create_model, step_score]
 
-    # Create the baseline job using
-    dataset_format = DatasetFormat.csv()
-    env = {
-        "dataset_format": json.dumps(dataset_format),
-        "dataset_source": "/opt/ml/processing/input/baseline_dataset_input",
-        "output_path": "/opt/ml/processing/output",
-        "publish_cloudwatch_metrics": "Disabled",
-    }
+    if baseline_uri is not None and reporting_uri is not None:
+        # Get the default model monitor container
+        model_monitor_container_uri = sagemaker.image_uris.retrieve(
+            framework="model-monitor",
+            region=region,
+            version="latest",
+        )
 
-    monitor_analyzer = Processor(
-        image_uri=model_monitor_container_uri,
-        role=role,
-        instance_count=monitor_instance_count,
-        instance_type=monitor_instance_type,
-        base_job_name=f"{base_job_prefix}/monitoring",
-        sagemaker_session=sagemaker_session,
-        max_runtime_in_seconds=1800,
-        env=env,
-    )
+        # Create the baseline job using
+        dataset_format = DatasetFormat.csv()
+        env = {
+            "dataset_format": json.dumps(dataset_format),
+            "dataset_source": "/opt/ml/processing/input/baseline_dataset_input",
+            "output_path": "/opt/ml/processing/output",
+            "publish_cloudwatch_metrics": "Disabled",
+        }
 
-    step_monitor = ProcessingStep(
-        name="ModelMonitor",
-        processor=monitor_analyzer,
-        inputs=[
-            ProcessingInput(
-                source=step_score.properties.ProcessingOutputConfig.Outputs[
-                    "scores"
-                ].S3Output.S3Uri,
-                destination="/opt/ml/processing/input/baseline_dataset_input",
-                input_name="baseline_dataset_input",
-            ),
-            ProcessingInput(
-                source=os.path.join(baseline_uri, "constraints.json"),
-                destination="/opt/ml/processing/baseline/constraints",
-                input_name="constraints",
-            ),
-            ProcessingInput(
-                source=os.path.join(baseline_uri, "statistics.json"),
-                destination="/opt/ml/processing/baseline/stats",
-                input_name="baseline",
-            ),
-        ],
-        outputs=[
-            ProcessingOutput(
-                source="/opt/ml/processing/output",
-                destination=output_monitor_uri,
-                output_name="monitoring_output",
-            ),
-        ],
-        cache_config=cache_config,
-    )
+        monitor_analyzer = Processor(
+            image_uri=model_monitor_container_uri,
+            role=role,
+            instance_count=monitor_instance_count,
+            instance_type=monitor_instance_type,
+            base_job_name=f"{base_job_prefix}/monitoring",
+            sagemaker_session=sagemaker_session,
+            max_runtime_in_seconds=1800,
+            env=env,
+        )
+
+        step_monitor = ProcessingStep(
+            name="ModelMonitor",
+            processor=monitor_analyzer,
+            inputs=[
+                ProcessingInput(
+                    source=step_score.properties.ProcessingOutputConfig.Outputs[
+                        "scores"
+                    ].S3Output.S3Uri,
+                    destination="/opt/ml/processing/input/baseline_dataset_input",
+                    input_name="baseline_dataset_input",
+                ),
+                ProcessingInput(
+                    source=os.path.join(baseline_uri, "constraints.json"),
+                    destination="/opt/ml/processing/baseline/constraints",
+                    input_name="constraints",
+                ),
+                ProcessingInput(
+                    source=os.path.join(baseline_uri, "statistics.json"),
+                    destination="/opt/ml/processing/baseline/stats",
+                    input_name="baseline",
+                ),
+            ],
+            outputs=[
+                ProcessingOutput(
+                    source="/opt/ml/processing/output",
+                    destination=reporting_uri,
+                    output_name="monitoring_output",
+                ),
+            ],
+            cache_config=cache_config,
+        )
+
+        steps += [step_monitor]
 
     # pipeline instance
     pipeline = Pipeline(
@@ -217,14 +241,13 @@ def get_pipeline(
         parameters=[
             input_data_uri,
             input_model_uri,
+            output_transform_uri,
             transform_instance_count,
             transform_instance_type,
             monitor_instance_count,
             monitor_instance_type,
-            output_transform_uri,
-            output_monitor_uri,
         ],
-        steps=[step_score, step_monitor],
+        steps=steps,
         sagemaker_session=sagemaker_session,
     )
 

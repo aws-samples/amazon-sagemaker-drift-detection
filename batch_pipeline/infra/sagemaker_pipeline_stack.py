@@ -22,6 +22,8 @@ class SageMakerPipelineStack(core.Stack):
         pipeline_definition_key: str,
         role_arn: str,
         tags: list,
+        reporting_uri: str = None,
+        pipeline_arn: str = None,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -40,3 +42,5 @@ class SageMakerPipelineStack(core.Stack):
             role_arn=role_arn,
             tags=tags,
         )
+
+        # TODO: If reporting_uri is not null add CWE and trigger for pipeline_arn

@@ -184,22 +184,45 @@ class BatchPipelineConstruct(core.Construct):
                     ],
                 ),
                 codepipeline.StageProps(
-                    stage_name="Pipeline",
+                    stage_name="BatchStaging",
                     actions=[
                         codepipeline_actions.CloudFormationCreateUpdateStackAction(
-                            action_name="Create_CFN_Pipeline",
+                            action_name="Batch_CFN_Staging",
                             run_order=1,
                             template_path=pipeline_build_output.at_path(
-                                "drift-batch-pipeline.template.json"
+                                "drift-batch-staging.template.json"
                             ),
-                            stack_name=f"sagemaker-{project_name}-batch",
+                            stack_name=f"sagemaker-{project_name}-batch-staging",
                             admin_permissions=False,
                             deployment_role=cloudformation_role,
                             replace_on_failure=True,
                             role=code_pipeline_role,
                         ),
+                        codepipeline_actions.ManualApprovalAction(
+                            action_name="Approve_Staging",
+                            run_order=2,
+                            additional_information="Approving deployment for production",
+                            role=code_pipeline_role,
+                        ),
                     ],
-                ),  # TODO: Add approval and production batch
+                ),
+                codepipeline.StageProps(
+                    stage_name="BatchProd",
+                    actions=[
+                        codepipeline_actions.CloudFormationCreateUpdateStackAction(
+                            action_name="Batch_CFN_Prod",
+                            run_order=1,
+                            template_path=pipeline_build_output.at_path(
+                                "drift-batch-prod.template.json"
+                            ),
+                            stack_name=f"sagemaker-{project_name}-batch-prod",
+                            admin_permissions=False,
+                            deployment_role=cloudformation_role,
+                            role=code_pipeline_role,
+                            replace_on_failure=True,
+                        ),
+                    ],
+                ),
             ],
         )
 
@@ -231,6 +254,9 @@ class BatchPipelineConstruct(core.Construct):
             memory_size=128,
             environment={
                 "LOG_LEVEL": "INFO",
+                "CODE_PIPELINE_NAME": code_pipeline_name,
+                "DRIFT_RULE_NAME": "",  # TODO: Remove these
+                "SCHEDULE_RULE_NAME": schedule_rule_name,  # TODO: Remove these
             },
         )
 
