@@ -1,6 +1,6 @@
 {
     "stage_name": "prod",
-    "instance_count": 2,
+    "instance_count": 1,
     "instance_type": "ml.m5.large",
     "model_monitor_enabled": true
 }

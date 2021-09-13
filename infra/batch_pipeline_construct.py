@@ -137,6 +137,9 @@ class BatchPipelineConstruct(core.Construct):
                     "SAGEMAKER_PIPELINE_ROLE_ARN": codebuild.BuildEnvironmentVariable(
                         value=sagemaker_execution_role.role_arn,
                     ),
+                    "EVENT_ROLE_ARN": codebuild.BuildEnvironmentVariable(
+                        value=event_role.role_arn,  # Event role for targeting Build pipeline
+                    ),
                     "ARTIFACT_BUCKET": codebuild.BuildEnvironmentVariable(
                         value=s3_artifact.bucket_name
                     ),
@@ -255,8 +258,8 @@ class BatchPipelineConstruct(core.Construct):
             environment={
                 "LOG_LEVEL": "INFO",
                 "CODE_PIPELINE_NAME": code_pipeline_name,
-                "DRIFT_RULE_NAME": "",  # TODO: Remove these
-                "SCHEDULE_RULE_NAME": schedule_rule_name,  # TODO: Remove these
+                "DRIFT_RULE_NAME": "",
+                "SCHEDULE_RULE_NAME": schedule_rule_name,
             },
         )
 
@@ -282,14 +285,6 @@ class BatchPipelineConstruct(core.Construct):
             )
         )
 
-        # TODO: Use generic method to disable code pipeline / event bridge rules
-        event_payload = events.RuleTargetInput.from_object(
-            {
-                "CodePipeline": code_pipeline_name,
-                "RuleList": [schedule_rule_name],
-            }
-        )
-
         # Rule to enable/disable rules when start/stop of sagemaker pipeline
         events.Rule(
             self,
@@ -311,9 +306,7 @@ class BatchPipelineConstruct(core.Construct):
                 },
                 resources=[sagemaker_pipeline_arn],
             ),
-            targets=[
-                targets.LambdaFunction(lambda_pipeline_change, event=event_payload)
-            ],
+            targets=[targets.LambdaFunction(handler=lambda_pipeline_change)],
         )
 
         # Allow event role to start code pipeline

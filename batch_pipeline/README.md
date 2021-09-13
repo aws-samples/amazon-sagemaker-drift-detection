@@ -11,6 +11,26 @@ The model build pipeline contains three stages:
 3. BatchStaging: This stage executes the staging CloudFormation template to create/update a **SageMaker Pipeline** based on the latest approved model. The pipeline includes a manual approval gate, which triggers the deployment of the model to production.
 4. BatchProd: This stage creates or updates a **SageMaker Pipelines** which includes a **SageMaker Model Monitor** job that will output `constraint_violations.json` when drift is detected.  A [CloudWatch Event](https://docs.aws.amazon.com/codepipeline/latest/userguide/create-cloudtrail-S3-source-cfn.html) rule is setup to trigger re-training when this this file is output to S3.
 
-![Build Pipeline](../docs/drift-batch-pipeline.png)
+![Batch Pipeline](../docs/drift-batch-pipeline.png)
 
 The batch transform pipeline will be triggered when a new file is uploaded to S3 or on a regular schedule.
+
+## Testing
+
+Once you have created a SageMaker Project, you can test the **Build** stage.
+
+### Build Stage
+
+Export the environment variables for the `SAGEMAKER_PROJECT_NAME` and `SAGEMAKER_PROJECT_ID` created by your SageMaker Project cloud formation.
+
+Then run the `python` command:
+
+```
+export SAGEMAKER_PROJECT_NAME="<<project_name>>"
+export SAGEMAKER_PROJECT_ID="<<project_id>>"
+export AWS_REGION="<<region>>"
+export ARTIFACT_BUCKET="sagemaker-project-<<project_id>>-build-<<region>>"
+export SAGEMAKER_PIPELINE_ROLE_ARN="<<service_catalog_product_use_role>>"
+export EVENT_ROLE_ARN="<<service_catalog_product_use_role>>"
+cdk synth
+```

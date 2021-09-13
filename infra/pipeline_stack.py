@@ -1,5 +1,6 @@
 from aws_cdk import (
     core,
+    aws_cloudtrail as cloudtrail,
     aws_iam as iam,
     aws_s3 as s3,
 )
@@ -37,14 +38,6 @@ class PipelineStack(core.Stack):
         )
         # Require a schedule parameter (must be cron, otherwise will trigger every time rate is enabled/disabled)
         # https://docs.aws.amazon.com/AmazonCloudWatch/latest/events/ScheduledEvents.html
-        batch_schedule = core.CfnParameter(
-            self,
-            "BatchSchedule",
-            type="String",
-            description="The expression to batch schedule.  Defaults to every day.",
-            default="cron(0 12 * * ? *)",  # Every day at 12am
-            min_length=1,
-        )
         retrain_schedule = core.CfnParameter(
             self,
             "RetrainSchedule",
@@ -61,15 +54,37 @@ class PipelineStack(core.Stack):
         seed_deploy_key = self.resolve_ssm_parameter("CodeCommitDeployKey")
 
         # Create the s3 artifact (name must be < 63 chars)
+        artifact_bucket_name = (
+            f"sagemaker-project-{project_id.value_as_string}-{self.region}"
+        )
         s3_artifact = s3.Bucket(
             self,
             "S3Artifact",
-            bucket_name="sagemaker-project-{}-{}".format(
-                project_id.value_as_string, self.region
-            ),
+            bucket_name=artifact_bucket_name,
             removal_policy=core.RemovalPolicy.DESTROY,
         )
 
+        # Create the s3 artifact trail, which event selector on all artifact s3 resources
+        # see: https://docs.aws.amazon.com/cdk/api/latest/python/aws_cdk.aws_cloudtrail/README.html
+        s3_cloudtrail = cloudtrail.Trail(
+            self,
+            "S3ArtifactTrail",
+            trail_name=artifact_bucket_name,
+            bucket=s3_artifact,
+            management_events=cloudtrail.ReadWriteType.WRITE_ONLY,
+            include_global_service_events=True,
+            is_multi_region_trail=False,
+        )
+        s3_cloudtrail.add_s3_event_selector(
+            [
+                cloudtrail.S3EventSelector(
+                    bucket=s3_artifact,
+                    object_prefix=f"{project_id.value_as_string}/",
+                )
+            ]
+        )
+
+        # Create cloudtrail for this bucket (to ensure bucket has the right policy)
         core.CfnOutput(self, "ArtifactBucket", value=s3_artifact.bucket_name)
 
         # Get the service catalog role for all permssions (if None CDK will create new roles)
@@ -125,6 +140,28 @@ class PipelineStack(core.Stack):
                 "EventRole",
                 assumed_by=iam.ServicePrincipal("events.amazonaws.com"),
                 path="/service-role/",
+            )
+
+            # Add cloudformation to allow creating CW rules for re-training, and passing event role
+            cloudformation_role.add_to_policy(
+                iam.PolicyStatement(
+                    actions=[
+                        "events:DeleteRule",
+                        "events:DescribeRule",
+                        "events:PutRule",
+                        "events:PutTargets",
+                        "events:RemoveTargets",
+                    ],
+                    resources=["arn:aws:events:*:*:rule/sagemaker-*"],
+                )
+            )
+            cloudformation_role.add_to_policy(
+                iam.PolicyStatement(
+                    actions=[
+                        "iam:PassRole",
+                    ],
+                    resources=[event_role.role_arn],
+                )
             )
 
             # Add cloudwatch logs
@@ -224,42 +261,50 @@ class PipelineStack(core.Stack):
             retrain_schedule=retrain_schedule.value_as_string,
         )
 
-        # Set the build pipeline
-        self.batch_pipeline = BatchPipelineConstruct(
-            self,
-            "batch",
-            env=env,
-            sagemaker_execution_role=sagemaker_execution_role,
-            code_pipeline_role=code_pipeline_role,
-            code_build_role=code_build_role,
-            cloudformation_role=cloudformation_role,
-            event_role=event_role,
-            lambda_role=lambda_role,
-            s3_artifact=s3_artifact,
-            branch_name=branch_name,
-            project_id=project_id.value_as_string,
-            project_name=project_name.value_as_string,
-            seed_bucket=seed_bucket,
-            seed_key=seed_batch_key,
-            batch_schedule=batch_schedule.value_as_string,
-        )
+        if self.node.try_get_context("drift:BatchEnabled"):
+            batch_schedule = core.CfnParameter(
+                self,
+                "BatchSchedule",
+                type="String",
+                description="The expression to batch schedule.  Defaults to every day.",
+                default="cron(0 12 * * ? *)",  # Every day at 12am
+                min_length=1,
+            )
+            BatchPipelineConstruct(
+                self,
+                "batch",
+                env=env,
+                sagemaker_execution_role=sagemaker_execution_role,
+                code_pipeline_role=code_pipeline_role,
+                code_build_role=code_build_role,
+                cloudformation_role=cloudformation_role,
+                event_role=event_role,
+                lambda_role=lambda_role,
+                s3_artifact=s3_artifact,
+                branch_name=branch_name,
+                project_id=project_id.value_as_string,
+                project_name=project_name.value_as_string,
+                seed_bucket=seed_bucket,
+                seed_key=seed_batch_key,
+                batch_schedule=batch_schedule.value_as_string,
+            )
 
-        # Set the build pipeline
-        self.deploy_pipeline = DeployPipelineConstruct(
-            self,
-            "deploy",
-            sagemaker_execution_role=sagemaker_execution_role,
-            code_pipeline_role=code_pipeline_role,
-            code_build_role=code_build_role,
-            cloudformation_role=cloudformation_role,
-            event_role=event_role,
-            s3_artifact=s3_artifact,
-            branch_name=branch_name,
-            project_id=project_id.value_as_string,
-            project_name=project_name.value_as_string,
-            seed_bucket=seed_bucket,
-            seed_key=seed_deploy_key,
-        )
+        if self.node.try_get_context("drift:DeployEnabled"):
+            DeployPipelineConstruct(
+                self,
+                "deploy",
+                sagemaker_execution_role=sagemaker_execution_role,
+                code_pipeline_role=code_pipeline_role,
+                code_build_role=code_build_role,
+                cloudformation_role=cloudformation_role,
+                event_role=event_role,
+                s3_artifact=s3_artifact,
+                branch_name=branch_name,
+                project_id=project_id.value_as_string,
+                project_name=project_name.value_as_string,
+                seed_bucket=seed_bucket,
+                seed_key=seed_deploy_key,
+            )
 
     def resolve_ssm_parameter(self, key: str):
         parameter_name = self.node.try_get_context(f"drift:{key}")

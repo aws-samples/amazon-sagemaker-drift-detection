@@ -8,13 +8,13 @@
     "@aws-cdk/aws-secretsmanager:parseOwnedSecretName": true,
     "@aws-cdk/aws-kms:defaultKeyPolicies": true,
     "@aws-cdk/aws-s3:grantWriteWithoutAcl": true,
-    "log_level": "INFO",
     "drift:ProductsUseRoleName": "service-role/AmazonSageMakerServiceCatalogProductsUseRole",
     "drift:ProductsLaunchRoleName": "service-role/AmazonSageMakerServiceCatalogProductsLaunchRole",
     "drift:CodeCommitSeedBucket": "/drift-pipeline/CodeCommitSeedBucket",
     "drift:CodeCommitBuildKey": "/drift-pipeline/CodeCommitBuildKey",
     "drift:CodeCommitDeployKey": "/drift-pipeline/CodeCommitDeployKey",
     "drift:CodeCommitBatchKey": "/drift-pipeline/CodeCommitBatchKey",
-    "drift:LambdaKey": "/drift-pipeline/LambdaKey"
+    "drift:BatchEnabled": true,
+    "drift:DeployEnabled": true
   }
 }

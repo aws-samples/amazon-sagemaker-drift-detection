@@ -130,6 +130,20 @@ class ServiceCatalogStack(core.Stack):
                 )
             )
 
+            products_use_role.add_to_principal_policy(
+                iam.PolicyStatement(
+                    actions=["iam:CreateServiceLinkedRole"],
+                    resources=[
+                        f"arn:aws:iam::{self.account}:role/aws-service-role/sagemaker.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_SageMakerEndpoint"
+                    ],
+                    conditions={
+                        "StringLike": {
+                            "iam:AWSServiceName": "sagemaker.application-autoscaling.amazonaws.com"
+                        }
+                    },
+                )
+            )
+
             # Add permissions to enable/disable sagemaker pipeline stages
             products_use_role.add_to_principal_policy(
                 iam.PolicyStatement(
@@ -156,17 +170,15 @@ class ServiceCatalogStack(core.Stack):
                 )
             )
 
-            products_use_role.add_to_principal_policy(
+            # Allow cloudformation to create a new cloudtrail for s3 events
+            products_use_role.add_to_policy(
                 iam.PolicyStatement(
-                    actions=["iam:CreateServiceLinkedRole"],
-                    resources=[
-                        f"arn:aws:iam::{self.account}:role/aws-service-role/sagemaker.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_SageMakerEndpoint"
+                    actions=[
+                        "cloudtrail:*",
                     ],
-                    conditions={
-                        "StringLike": {
-                            "iam:AWSServiceName": "sagemaker.application-autoscaling.amazonaws.com"
-                        }
-                    },
+                    resources=[
+                        f"arn:aws:cloudtrail:{self.region}:{self.account}:trail/sagemaker-*",
+                    ],
                 )
             )
 

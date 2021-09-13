@@ -22,10 +22,12 @@ registry = ModelRegistry()
 
 
 def create_pipeline(
+    app: core.App,
     project_name: str,
     project_id: str,
     region: str,
-    sagemaker_pipeline_role: str,
+    sagemaker_pipeline_role_arn: str,
+    event_role_arn: str,
     artifact_bucket: str,
     stage_name: str,
 ):
@@ -57,15 +59,19 @@ def create_pipeline(
     # Set the default input data uri
     data_uri = f"s3://{artifact_bucket}/{project_id}/batch/{stage_name}"
 
+    # set the output transform uri
+    transform_uri = f"s3://{artifact_bucket}/{project_id}/transform/{stage_name}"
+
     # Get the pipeline execution to get the baseline uri
     pipeline_execution_arn = registry.get_pipeline_execution_arn(
         batch_config.model_package_arn
     )
+    logger.info(f"Got pipeline exection arn: {pipeline_execution_arn}")
     model_uri = registry.get_model_artifact(pipeline_execution_arn)
     logger.info(f"Got model uri: {model_uri}")
 
     # If we have drift configuration then get the baseline uri
-    baseline_uri = reporting_uri = pipeline_arn = None
+    baseline_uri = reporting_uri = sagemaker_pipeline_arn = None
     if batch_config.model_monitor_enabled:
         baseline_uri = registry.get_processing_output(pipeline_execution_arn)
         logger.info(f"Got baseline uri: {baseline_uri}")
@@ -74,18 +80,19 @@ def create_pipeline(
             f"s3://{artifact_bucket}/{project_id}/monitoring/{pipeline_path}"
         )
         logger.info(f"Got reporting uri: {reporting_uri}")
-        pipeline_arn = registry.get_pipeline_arn(pipeline_execution_arn)
-        logger.info(f"Got pipeline arn: {pipeline_arn}")
+        sagemaker_pipeline_arn = registry.get_pipeline_arn(pipeline_execution_arn)
+        logger.info(f"Got pipeline arn: {sagemaker_pipeline_arn}")
 
     # Create batch pipeline
     pipeline = get_pipeline(
         region=region,
-        role=sagemaker_pipeline_role,
+        role=sagemaker_pipeline_role_arn,
         pipeline_name=sagemaker_pipeline_name,
         default_bucket=artifact_bucket,
         base_job_prefix=project_id,
         data_uri=data_uri,
         model_uri=model_uri,
+        transform_uri=transform_uri,
         baseline_uri=baseline_uri,
         reporting_uri=reporting_uri,
     )
@@ -98,15 +105,12 @@ def create_pipeline(
 
     # Upload the pipeline to S3 bucket/key and return JSON with key/value for for Cfn Stack parameters.
     # see: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-sagemaker-pipeline.html
-    print(f"Uploading {stage_name} pipeline to {artifact_bucket}")
+    logger.info(f"Uploading {stage_name} pipeline to {artifact_bucket}")
     pipeline_definition_key = upload_pipeline(
         pipeline,
         default_bucket=artifact_bucket,
         base_job_prefix=f"{project_id}/batch-{stage_name}",
     )
-
-    # Create App and stacks
-    app = core.App()
 
     tags = [
         core.CfnTag(key="sagemaker:deployment-stage", value=stage_name),
@@ -121,39 +125,48 @@ def create_pipeline(
         pipeline_description=sagemaker_pipeline_description,
         pipeline_definition_bucket=artifact_bucket,
         pipeline_definition_key=pipeline_definition_key,
-        role_arn=sagemaker_pipeline_role,
+        sagemaker_role_arn=sagemaker_pipeline_role_arn,
+        event_role_arn=event_role_arn,
         tags=tags,
         reporting_uri=reporting_uri,
-        pipeline_arn=pipeline_arn,
+        sagemaker_pipeline_arn=sagemaker_pipeline_arn,
     )
-
-    app.synth()
 
 
 def main(
     project_name: str,
     project_id: str,
     region: str,
-    sagemaker_pipeline_role: str,
+    sagemaker_pipeline_role_arn: str,
+    event_role_arn: str,
     artifact_bucket: str,
 ):
+    # Create App and stacks
+    app = core.App()
+
     create_pipeline(
+        app=app,
         project_name=project_name,
         project_id=project_id,
         region=region,
-        sagemaker_pipeline_role=sagemaker_pipeline_role,
+        sagemaker_pipeline_role_arn=sagemaker_pipeline_role_arn,
+        event_role_arn=event_role_arn,
         artifact_bucket=artifact_bucket,
         stage_name="staging",
     )
 
     create_pipeline(
+        app=app,
         project_name=project_name,
         project_id=project_id,
         region=region,
-        sagemaker_pipeline_role=sagemaker_pipeline_role,
+        sagemaker_pipeline_role_arn=sagemaker_pipeline_role_arn,
+        event_role_arn=event_role_arn,
         artifact_bucket=artifact_bucket,
         stage_name="prod",
     )
+
+    app.synth()
 
 
 if __name__ == "__main__":
@@ -165,8 +178,12 @@ if __name__ == "__main__":
     )
     parser.add_argument("--project-id", default=os.environ.get("SAGEMAKER_PROJECT_ID"))
     parser.add_argument(
-        "--sagemaker-pipeline-role",
+        "--sagemaker-pipeline-role-arn",
         default=os.environ.get("SAGEMAKER_PIPELINE_ROLE_ARN"),
+    )
+    parser.add_argument(
+        "--event-role-arn",
+        default=os.environ.get("EVENT_ROLE_ARN"),
     )
     parser.add_argument(
         "--artifact-bucket",

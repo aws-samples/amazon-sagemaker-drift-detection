@@ -71,6 +71,7 @@ def get_pipeline(
     base_job_prefix: str,
     data_uri: str,
     model_uri: str,
+    transform_uri: str,
     baseline_uri: str = None,
     reporting_uri: str = None,
 ) -> Pipeline:
@@ -81,8 +82,11 @@ def get_pipeline(
         pipeline_name: the bucket to use for storing the artifacts
         default_bucket: the bucket to use for storing the artifacts
         base_job_prefix: the prefix to include after the bucket
-        model_uri: model uri
-        baseline_uri: optional baseline uri for drift detection
+        data_uri: the input data location
+        model_uri: the input model location
+        transform_uri: the output transform uri location
+        baseline_uri: optional input baseline uri for drift detection
+        reporting_uri: optional output reporting uri for drift detection
     Returns:
         an instance of a pipeline
     """
@@ -99,7 +103,7 @@ def get_pipeline(
     )
     output_transform_uri = ParameterString(
         name="TransformOutputUri",
-        default_value=f"s3://{default_bucket}/{base_job_prefix}/transform/",
+        default_value=transform_uri,
     )
     transform_instance_count = ParameterInteger(
         name="TransformInstanceCount", default_value=1
