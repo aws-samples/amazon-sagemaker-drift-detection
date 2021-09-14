@@ -170,18 +170,6 @@ class ServiceCatalogStack(core.Stack):
                 )
             )
 
-            # Allow cloudformation to create a new cloudtrail for s3 events
-            products_use_role.add_to_policy(
-                iam.PolicyStatement(
-                    actions=[
-                        "cloudtrail:*",
-                    ],
-                    resources=[
-                        f"arn:aws:cloudtrail:{self.region}:{self.account}:trail/sagemaker-*",
-                    ],
-                )
-            )
-
         # Create the launch role
         products_launch_role_name = self.node.try_get_context(
             "drift:ProductsLaunchRoleName"
@@ -191,12 +179,6 @@ class ServiceCatalogStack(core.Stack):
             "LaunchRole",
             role_arn=f"arn:{self.partition}:iam::{self.account}:role/{products_launch_role_name}",
         )
-
-        # portfolio.give_access_to_role(
-        #     iam.Role.from_role_arn(
-        #         self, "execution_role_arn", role_arn=execution_role_arn.value_as_string
-        #     )
-        # )
 
         portfolio_association = servicecatalog.CfnPortfolioPrincipalAssociation(
             self,

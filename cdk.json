@@ -14,7 +14,8 @@
     "drift:CodeCommitBuildKey": "/drift-pipeline/CodeCommitBuildKey",
     "drift:CodeCommitDeployKey": "/drift-pipeline/CodeCommitDeployKey",
     "drift:CodeCommitBatchKey": "/drift-pipeline/CodeCommitBatchKey",
-    "drift:BatchEnabled": true,
-    "drift:DeployEnabled": true
+    "drift:BuildPipeline": true,
+    "drift:BatchPipeline": true,
+    "drift:DeployPipeline": true
   }
 }

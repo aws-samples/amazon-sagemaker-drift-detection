@@ -36,16 +36,6 @@ class PipelineStack(core.Stack):
             max_length=16,
             description="Service generated Id of the project.",
         )
-        # Require a schedule parameter (must be cron, otherwise will trigger every time rate is enabled/disabled)
-        # https://docs.aws.amazon.com/AmazonCloudWatch/latest/events/ScheduledEvents.html
-        retrain_schedule = core.CfnParameter(
-            self,
-            "RetrainSchedule",
-            type="String",
-            description="The expression to retrain schedule.  Defaults to first day of the month.",
-            default="cron(0 12 1 * ? *)",  # 1st of the month at 12am
-            min_length=1,
-        )
 
         # Get drift-pipeline parameters
         seed_bucket = self.resolve_ssm_parameter("CodeCommitSeedBucket")
@@ -71,7 +61,6 @@ class PipelineStack(core.Stack):
             "S3ArtifactTrail",
             trail_name=artifact_bucket_name,
             bucket=s3_artifact,
-            management_events=cloudtrail.ReadWriteType.WRITE_ONLY,
             include_global_service_events=True,
             is_multi_region_trail=False,
         )
@@ -234,6 +223,8 @@ class PipelineStack(core.Stack):
             sagemaker_policy.attach_to_role(code_build_role)
             # CloudFormation creates models and endpoints
             sagemaker_policy.attach_to_role(cloudformation_role)
+            # Lambda needs to describe SM and put metrics
+            sagemaker_policy.attach_to_role(lambda_role)
 
         # Define an environment object to pass to build
         env = core.Environment(account=self.account, region=self.region)
@@ -241,27 +232,37 @@ class PipelineStack(core.Stack):
         # Define the repository name and branch
         branch_name = "main"
 
-        # Set the build pipeline
-        self.build_pipeline = BuildPipelineConstruct(
-            self,
-            "build",
-            env=env,
-            sagemaker_execution_role=sagemaker_execution_role,
-            code_pipeline_role=code_pipeline_role,
-            code_build_role=code_build_role,
-            cloudformation_role=cloudformation_role,
-            event_role=event_role,
-            lambda_role=lambda_role,
-            s3_artifact=s3_artifact,
-            branch_name=branch_name,
-            project_id=project_id.value_as_string,
-            project_name=project_name.value_as_string,
-            seed_bucket=seed_bucket,
-            seed_key=seed_build_key,
-            retrain_schedule=retrain_schedule.value_as_string,
-        )
+        if self.node.try_get_context("drift:BuildPipeline"):
+            # Require a schedule parameter (must be cron, otherwise will trigger every time rate is enabled/disabled)
+            # https://docs.aws.amazon.com/AmazonCloudWatch/latest/events/ScheduledEvents.html
+            retrain_schedule = core.CfnParameter(
+                self,
+                "RetrainSchedule",
+                type="String",
+                description="The expression to retrain schedule.  Defaults to first day of the month.",
+                default="cron(0 12 1 * ? *)",  # 1st of the month at 12am
+                min_length=1,
+            )
+            BuildPipelineConstruct(
+                self,
+                "build",
+                env=env,
+                sagemaker_execution_role=sagemaker_execution_role,
+                code_pipeline_role=code_pipeline_role,
+                code_build_role=code_build_role,
+                cloudformation_role=cloudformation_role,
+                event_role=event_role,
+                lambda_role=lambda_role,
+                s3_artifact=s3_artifact,
+                branch_name=branch_name,
+                project_id=project_id.value_as_string,
+                project_name=project_name.value_as_string,
+                seed_bucket=seed_bucket,
+                seed_key=seed_build_key,
+                retrain_schedule=retrain_schedule.value_as_string,
+            )
 
-        if self.node.try_get_context("drift:BatchEnabled"):
+        if self.node.try_get_context("drift:BatchPipeline"):
             batch_schedule = core.CfnParameter(
                 self,
                 "BatchSchedule",
@@ -289,7 +290,7 @@ class PipelineStack(core.Stack):
                 batch_schedule=batch_schedule.value_as_string,
             )
 
-        if self.node.try_get_context("drift:DeployEnabled"):
+        if self.node.try_get_context("drift:DeployPipeline"):
             DeployPipelineConstruct(
                 self,
                 "deploy",

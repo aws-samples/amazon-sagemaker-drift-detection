@@ -253,7 +253,7 @@ class BuildPipelineConstruct(core.Construct):
             )
         )
 
-        # TODO: Add Fix to ensure `detail_type` emits as `detail-type` in CFN
+        # Create an events rule that pickup the endpoint and batch alarms
         drift_rule = events.CfnRule(
             self,
             "DriftRule",
@@ -267,6 +267,8 @@ class BuildPipelineConstruct(core.Construct):
                     "alarmName": [
                         f"sagemaker-{project_name}-staging-threshold",
                         f"sagemaker-{project_name}-prod-threshold",
+                        f"sagemaker-{project_name}-batch-staging-threshold",
+                        f"sagemaker-{project_name}-batch-prod-threshold",
                     ],
                     "state": {"value": ["ALARM"]},
                 },

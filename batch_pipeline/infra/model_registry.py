@@ -217,19 +217,6 @@ class ModelRegistry:
             "MetadataProperties"
         ]["GeneratedBy"]
 
-    def get_pipeline_arn(self, pipeline_execution_arn: str):
-        """Returns the pipeline arn for this execution
-
-        Args:
-            pipeline_execution_arn: The pipeline execution arn
-
-        Returns:
-            Return the pipline info including the PipelineArn and PipelineExecutionDisplayName
-        """
-        return self.sm_client.describe_pipeline_execution(
-            PipelineExecutionArn=pipeline_execution_arn
-        )["PipelineArn"]
-
     def get_model_artifact(
         self,
         pipeline_execution_arn: str,

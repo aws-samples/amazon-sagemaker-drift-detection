@@ -24,8 +24,12 @@ from sagemaker.processing import (
     ScriptProcessor,
 )
 from sagemaker.s3 import S3Uploader
-from sagemaker.workflow.conditions import ConditionEquals
-from sagemaker.workflow.condition_step import ConditionStep
+from sagemaker.workflow.lambda_step import (
+    LambdaStep,
+    LambdaOutput,
+    LambdaOutputTypeEnum,
+)
+from sagemaker.lambda_helper import Lambda
 from sagemaker.workflow.parameters import (
     ParameterInteger,
     ParameterString,
@@ -69,11 +73,11 @@ def get_pipeline(
     pipeline_name: str,
     default_bucket: str,
     base_job_prefix: str,
+    evaluate_drift_function_arn: str,
     data_uri: str,
     model_uri: str,
     transform_uri: str,
     baseline_uri: str = None,
-    reporting_uri: str = None,
 ) -> Pipeline:
     """Gets a SageMaker ML Pipeline instance working with on nyc taxi data.
     Args:
@@ -86,7 +90,6 @@ def get_pipeline(
         model_uri: the input model location
         transform_uri: the output transform uri location
         baseline_uri: optional input baseline uri for drift detection
-        reporting_uri: optional output reporting uri for drift detection
     Returns:
         an instance of a pipeline
     """
@@ -177,7 +180,7 @@ def get_pipeline(
 
     steps = [step_create_model, step_score]
 
-    if baseline_uri is not None and reporting_uri is not None:
+    if baseline_uri is not None:
         # Get the default model monitor container
         model_monitor_container_uri = sagemaker.image_uris.retrieve(
             framework="model-monitor",
@@ -230,14 +233,30 @@ def get_pipeline(
             outputs=[
                 ProcessingOutput(
                     source="/opt/ml/processing/output",
-                    destination=reporting_uri,
                     output_name="monitoring_output",
                 ),
             ],
             cache_config=cache_config,
         )
 
-        steps += [step_monitor]
+        # Create a lambda step that inspects the output of the model monitoring
+        step_lambda = LambdaStep(
+            name="EvaludateDrift",
+            lambda_func=Lambda(function_arn=evaluate_drift_function_arn),
+            inputs={
+                "ProcessingJobName": step_monitor.properties.ProcessingJobName,
+                "PipelineName": pipeline_name,
+            },
+            outputs=[
+                LambdaOutput(
+                    output_name="statusCode", output_type=LambdaOutputTypeEnum.Integer
+                )
+            ],
+        )
+
+        # TODO: Fail workflow when statusCode==400
+
+        steps += [step_monitor, step_lambda]
 
     # pipeline instance
     pipeline = Pipeline(

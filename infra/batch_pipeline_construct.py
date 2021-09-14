@@ -81,6 +81,25 @@ class BatchPipelineConstruct(core.Construct):
             )
         )
 
+        # Load the start pipeline code
+        with open("lambda/batch/lambda_evaluate_drift.py", encoding="utf8") as fp:
+            lambda_evaluate_drift_code = fp.read()
+
+        lambda_evaluate_drift = lambda_.Function(
+            self,
+            "EvaluateDriftFunction",
+            function_name=f"sagemaker-{project_name}-evaluate-drift",
+            code=lambda_.Code.from_inline(lambda_evaluate_drift_code),
+            role=lambda_role,
+            handler="index.lambda_handler",
+            runtime=lambda_.Runtime.PYTHON_3_8,
+            timeout=core.Duration.seconds(3),
+            memory_size=128,
+            environment={
+                "LOG_LEVEL": "INFO",
+            },
+        )
+
         # Define AWS CodeBuild spec to run node.js and python
         # https://docs.aws.amazon.com/codebuild/latest/userguide/available-runtimes.html
         pipeline_build = codebuild.PipelineProject(
@@ -137,11 +156,11 @@ class BatchPipelineConstruct(core.Construct):
                     "SAGEMAKER_PIPELINE_ROLE_ARN": codebuild.BuildEnvironmentVariable(
                         value=sagemaker_execution_role.role_arn,
                     ),
-                    "EVENT_ROLE_ARN": codebuild.BuildEnvironmentVariable(
-                        value=event_role.role_arn,  # Event role for targeting Build pipeline
-                    ),
                     "ARTIFACT_BUCKET": codebuild.BuildEnvironmentVariable(
                         value=s3_artifact.bucket_name
+                    ),
+                    "EVALUATE_DRIFT_FUNCTION_ARN": codebuild.BuildEnvironmentVariable(
+                        value=lambda_evaluate_drift.function_arn,
                     ),
                 },
             ),

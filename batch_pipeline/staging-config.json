@@ -1,6 +1,5 @@
 {
     "stage_name": "staging",
     "instance_count": 1,
-    "instance_type": "ml.t2.medium",
-    "model_monitor_enabled": false
+    "instance_type": "ml.t2.medium"
 }

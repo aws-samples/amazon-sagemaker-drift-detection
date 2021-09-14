@@ -27,8 +27,8 @@ def create_pipeline(
     project_id: str,
     region: str,
     sagemaker_pipeline_role_arn: str,
-    event_role_arn: str,
     artifact_bucket: str,
+    evaluate_drift_function_arn: str,
     stage_name: str,
 ):
     # Get the stage specific deployment config for sagemaker
@@ -71,17 +71,10 @@ def create_pipeline(
     logger.info(f"Got model uri: {model_uri}")
 
     # If we have drift configuration then get the baseline uri
-    baseline_uri = reporting_uri = sagemaker_pipeline_arn = None
-    if batch_config.model_monitor_enabled:
+    baseline_uri = None
+    if batch_config.drift_config is not None:
         baseline_uri = registry.get_processing_output(pipeline_execution_arn)
         logger.info(f"Got baseline uri: {baseline_uri}")
-        pipeline_path = pipeline_execution_arn.split("/", 1)[1]
-        reporting_uri = (
-            f"s3://{artifact_bucket}/{project_id}/monitoring/{pipeline_path}"
-        )
-        logger.info(f"Got reporting uri: {reporting_uri}")
-        sagemaker_pipeline_arn = registry.get_pipeline_arn(pipeline_execution_arn)
-        logger.info(f"Got pipeline arn: {sagemaker_pipeline_arn}")
 
     # Create batch pipeline
     pipeline = get_pipeline(
@@ -90,11 +83,11 @@ def create_pipeline(
         pipeline_name=sagemaker_pipeline_name,
         default_bucket=artifact_bucket,
         base_job_prefix=project_id,
+        evaluate_drift_function_arn=evaluate_drift_function_arn,
         data_uri=data_uri,
         model_uri=model_uri,
         transform_uri=transform_uri,
         baseline_uri=baseline_uri,
-        reporting_uri=reporting_uri,
     )
 
     # Create the pipeline definition
@@ -126,10 +119,8 @@ def create_pipeline(
         pipeline_definition_bucket=artifact_bucket,
         pipeline_definition_key=pipeline_definition_key,
         sagemaker_role_arn=sagemaker_pipeline_role_arn,
-        event_role_arn=event_role_arn,
         tags=tags,
-        reporting_uri=reporting_uri,
-        sagemaker_pipeline_arn=sagemaker_pipeline_arn,
+        drift_config=batch_config.drift_config,
     )
 
 
@@ -138,8 +129,8 @@ def main(
     project_id: str,
     region: str,
     sagemaker_pipeline_role_arn: str,
-    event_role_arn: str,
     artifact_bucket: str,
+    evaluate_drift_function_arn: str,
 ):
     # Create App and stacks
     app = core.App()
@@ -150,8 +141,8 @@ def main(
         project_id=project_id,
         region=region,
         sagemaker_pipeline_role_arn=sagemaker_pipeline_role_arn,
-        event_role_arn=event_role_arn,
         artifact_bucket=artifact_bucket,
+        evaluate_drift_function_arn=evaluate_drift_function_arn,
         stage_name="staging",
     )
 
@@ -161,8 +152,8 @@ def main(
         project_id=project_id,
         region=region,
         sagemaker_pipeline_role_arn=sagemaker_pipeline_role_arn,
-        event_role_arn=event_role_arn,
         artifact_bucket=artifact_bucket,
+        evaluate_drift_function_arn=evaluate_drift_function_arn,
         stage_name="prod",
     )
 
@@ -182,8 +173,8 @@ if __name__ == "__main__":
         default=os.environ.get("SAGEMAKER_PIPELINE_ROLE_ARN"),
     )
     parser.add_argument(
-        "--event-role-arn",
-        default=os.environ.get("EVENT_ROLE_ARN"),
+        "--evaluate-drift-function-arn",
+        default=os.environ.get("EVALUATE_DRIFT_FUNCTION_ARN"),
     )
     parser.add_argument(
         "--artifact-bucket",

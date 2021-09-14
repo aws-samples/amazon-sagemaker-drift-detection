@@ -2,5 +2,10 @@
     "stage_name": "prod",
     "instance_count": 1,
     "instance_type": "ml.m5.large",
-    "model_monitor_enabled": true
+    "drift_config": {
+        "data_capture_sampling_percentage": 100,
+        "metric_name": "feature_baseline_drift_fare_amount",
+        "metric_threshold": 0.4,
+        "period": 3600
+    }
 }
