@@ -15,6 +15,9 @@ class PipelineStack(core.Stack):
         self,
         scope: core.Construct,
         construct_id: str,
+        build_pipeline: bool,
+        batch_pipeline: bool,
+        deply_pipeline: bool,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -232,7 +235,7 @@ class PipelineStack(core.Stack):
         # Define the repository name and branch
         branch_name = "main"
 
-        if self.node.try_get_context("drift:BuildPipeline"):
+        if build_pipeline:
             # Require a schedule parameter (must be cron, otherwise will trigger every time rate is enabled/disabled)
             # https://docs.aws.amazon.com/AmazonCloudWatch/latest/events/ScheduledEvents.html
             retrain_schedule = core.CfnParameter(
@@ -262,7 +265,7 @@ class PipelineStack(core.Stack):
                 retrain_schedule=retrain_schedule.value_as_string,
             )
 
-        if self.node.try_get_context("drift:BatchPipeline"):
+        if batch_pipeline:
             batch_schedule = core.CfnParameter(
                 self,
                 "BatchSchedule",
@@ -290,7 +293,7 @@ class PipelineStack(core.Stack):
                 batch_schedule=batch_schedule.value_as_string,
             )
 
-        if self.node.try_get_context("drift:DeployPipeline"):
+        if deply_pipeline:
             DeployPipelineConstruct(
                 self,
                 "deploy",
@@ -312,3 +315,27 @@ class PipelineStack(core.Stack):
         return core.CfnDynamicReference(
             core.CfnDynamicReferenceService.SSM, parameter_name
         ).to_string()
+
+
+class BatchPipelineStack(PipelineStack):
+    """Creates a Pipelinf for real-time deployment"""
+
+    def __init__(
+        self,
+        scope: core.Construct,
+        construct_id: str,
+        **kwargs,
+    ) -> None:
+        super().__init__(scope, construct_id, True, True, False, **kwargs)
+
+
+class DeployPipelineStack(PipelineStack):
+    """Creates a Pipelinf for real-time deployment"""
+
+    def __init__(
+        self,
+        scope: core.Construct,
+        construct_id: str,
+        **kwargs,
+    ) -> None:
+        super().__init__(scope, construct_id, True, False, True, **kwargs)

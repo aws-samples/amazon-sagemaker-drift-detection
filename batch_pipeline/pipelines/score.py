@@ -2,14 +2,12 @@
 import logging
 import pathlib
 import glob
-import os
 import pickle
 import tarfile
+from math import sqrt
 
 import pandas as pd
 import xgboost
-
-from math import sqrt
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -17,23 +15,10 @@ logger.addHandler(logging.StreamHandler())
 
 
 def load_data(file_list: list):
-    # Header columns
-    cols = [
-        "fare_amount",
-        "passenger_count",
-        "pickup_latitude",
-        "pickup_longitude",
-        "dropoff_latitude",
-        "dropoff_longitude",
-        "geo_distance",
-        "hour",
-        "weekday",
-        "month",
-    ]
-    # Concat input files with select columns
+    # Load input files with header
     dfs = []
     for file in file_list:
-        dfs.append(pd.read_csv(file, names=cols, index_col=None))
+        dfs.append(pd.read_csv(file))
     return pd.concat(dfs, ignore_index=True)
 
 

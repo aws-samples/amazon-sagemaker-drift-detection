@@ -241,7 +241,7 @@ def get_pipeline(
 
         # Create a lambda step that inspects the output of the model monitoring
         step_lambda = LambdaStep(
-            name="EvaludateDrift",
+            name="EvaluateDrift",
             lambda_func=Lambda(function_arn=evaluate_drift_function_arn),
             inputs={
                 "ProcessingJobName": step_monitor.properties.ProcessingJobName,

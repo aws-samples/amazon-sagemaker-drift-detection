@@ -124,13 +124,12 @@ def save_files(base_dir: str, data_df: pd.DataFrame, val_size=0.2, test_size=0.0
     logger.info(f"Writing out datasets to {base_dir}")
     train_df.to_csv(f"{base_dir}/train/train.csv", header=False, index=False)
     val_df.to_csv(f"{base_dir}/validation/validation.csv", header=False, index=False)
-    test_df.to_csv(f"{base_dir}/test/test.csv", header=False, index=False)
 
-    # Reset the test
-    test_df.reset_index(inplace=True, drop=True)
+    # Save test data with header
+    test_df.to_csv(f"{base_dir}/test/test.csv", header=True, index=False)
 
-    # Save baseline with headers
-    train_df.to_csv(f"{base_dir}/baseline/baseline.csv", index=False, header=True)
+    # Save training data as baseline with header
+    train_df.to_csv(f"{base_dir}/baseline/baseline.csv", header=True, index=False)
     return train_df, val_df, test_df
 
 
