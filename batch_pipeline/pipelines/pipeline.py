@@ -195,6 +195,8 @@ def get_pipeline(
             "dataset_source": "/opt/ml/processing/input/baseline_dataset_input",
             "output_path": "/opt/ml/processing/output",
             "publish_cloudwatch_metrics": "Disabled",
+            "baseline_constraints": "/opt/ml/processing/baseline/constraints/constraints.json",
+            "baseline_statistics": "/opt/ml/processing/baseline/stats/statistics.json",
         }
 
         monitor_analyzer = Processor(

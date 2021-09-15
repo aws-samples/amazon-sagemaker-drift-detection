@@ -4,7 +4,7 @@
     "instance_type": "ml.m5.large",
     "drift_config": {
         "data_capture_sampling_percentage": 100,
-        "metric_name": "feature_baseline_drift_fare_amount",
+        "metric_name": "feature_baseline_drift_geo_distance",
         "metric_threshold": 0.4,
         "period": 3600
     }
