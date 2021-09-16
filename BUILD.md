@@ -1,4 +1,4 @@
-# Amazon SageMaker Drift Detection Pipeline
+# Amazon SageMaker Drift Detection
 
 This page has details on how to build a custom SageMaker MLOps template from source.
 
