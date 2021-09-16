@@ -11,8 +11,8 @@ LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 BUCKET_NAME = os.getenv("BUCKET_NAME")
 BUCKET_PREFIX = os.getenv("BUCKET_PREFIX")
 BUCKET_ACL = os.getenv("BUCKET_ACL", "public-read")
-GITHUB_REF = os.getenv("GITHUB_REF")
-GITHUB_SHA = os.getenv("GITHUB_SHA")
+GITHUB_REF = os.getenv("GITHUB_REF", "local")
+GITHUB_SHA = os.getenv("GITHUB_SHA", "local")
 
 # Configure logging
 logger = logging.getLogger(__name__)

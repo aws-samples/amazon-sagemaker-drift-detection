@@ -8,8 +8,6 @@
     "@aws-cdk/aws-secretsmanager:parseOwnedSecretName": true,
     "@aws-cdk/aws-kms:defaultKeyPolicies": true,
     "@aws-cdk/aws-s3:grantWriteWithoutAcl": true,
-    "drift:ArtifactBucket": "amazon-sagemaker-safe-deployment-pipeline",
-    "drift:ArtifactBucketPrefix": "drift-pipeline/",
     "drift:ProductsUseRoleName": "service-role/AmazonSageMakerServiceCatalogProductsUseRole",
     "drift:ProductsLaunchRoleName": "service-role/AmazonSageMakerServiceCatalogProductsLaunchRole",
     "drift:CodeCommitSeedBucket": "/drift-pipeline/CodeCommitSeedBucket",

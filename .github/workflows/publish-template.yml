@@ -44,7 +44,10 @@ jobs:
           role-duration-seconds: 1200
 
       - name: Synth Template
-        run: cdk synth drift-service-catalog --path-metadata false > drift-service-catalog.yml
+        env:
+          BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
+          BUCKET_PREFIX: ${{ secrets.BUCKET_PREFIX }}
+        run: cdk synth drift-service-catalog --path-metadata false -c drift:ArtifactBucket=$BUCKET_NAME -c drift:ArtifactBucketPrefix=$BUCKET_PREFIX > drift-service-catalog.yml
 
       - name: Publish Assets to S3
         env:
