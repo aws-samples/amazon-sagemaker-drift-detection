@@ -57,25 +57,6 @@ class PipelineStack(core.Stack):
             removal_policy=core.RemovalPolicy.DESTROY,
         )
 
-        # Create the s3 artifact trail, which event selector on all artifact s3 resources
-        # see: https://docs.aws.amazon.com/cdk/api/latest/python/aws_cdk.aws_cloudtrail/README.html
-        s3_cloudtrail = cloudtrail.Trail(
-            self,
-            "S3ArtifactTrail",
-            trail_name=artifact_bucket_name,
-            bucket=s3_artifact,
-            include_global_service_events=True,
-            is_multi_region_trail=False,
-        )
-        s3_cloudtrail.add_s3_event_selector(
-            [
-                cloudtrail.S3EventSelector(
-                    bucket=s3_artifact,
-                    object_prefix=f"{project_id.value_as_string}/",
-                )
-            ]
-        )
-
         # Create cloudtrail for this bucket (to ensure bucket has the right policy)
         core.CfnOutput(self, "ArtifactBucket", value=s3_artifact.bucket_name)
 
