@@ -7,7 +7,7 @@ from aws_cdk import (
 )
 
 from infra.generate_sc_template import generate_template
-from infra.pipeline_stack import PipelineStack
+from infra.pipeline_stack import BatchPipelineStack, DeployPipelineStack
 
 
 # Create a Portfolio and Product
@@ -58,36 +58,15 @@ class ServiceCatalogStack(core.Stack):
             min_length=1,
         )
 
-        portfolio = servicecatalog.Portfolio(
+        # Create the launch role
+        products_launch_role_name = self.node.try_get_context(
+            "drift:ProductsLaunchRoleName"
+        )
+        products_launch_role = iam.Role.from_role_arn(
             self,
-            "Portfolio",
-            display_name=portfolio_name.value_as_string,
-            provider_name=portfolio_owner.value_as_string,
-            description="Organization templates for Drift Detection pipeline",
+            "LaunchRole",
+            role_arn=f"arn:{self.partition}:iam::{self.account}:role/{products_launch_role_name}",
         )
-
-        drift_pipeline_template = generate_template(
-            stack=PipelineStack, stack_name="drift-pipeline", strip_policies=True
-        )
-
-        product = servicecatalog.CloudFormationProduct(
-            self,
-            "Product",
-            owner=portfolio_owner.value_as_string,
-            product_name="Amazon Sagemaker Drift Detection Pipeline",
-            product_versions=[
-                servicecatalog.CloudFormationProductVersion(
-                    cloud_formation_template=servicecatalog.CloudFormationTemplate.from_asset(
-                        drift_pipeline_template
-                    ),
-                    product_version_name=product_version.value_as_string,
-                )
-            ],
-            description="Amazon SageMaker Project for a build and deployment pipeline that triggers on drift or schedule",
-        )
-        core.Tags.of(product).add(key="sagemaker:studio-visibility", value="true")
-
-        portfolio.add_product(product)
 
         # Get the service catalog role for all permssions (if None CDK will create new roles)
         # CodeBuild and CodePipeline resources need to start with "sagemaker-" to be within default policy
@@ -130,6 +109,20 @@ class ServiceCatalogStack(core.Stack):
                 )
             )
 
+            products_use_role.add_to_principal_policy(
+                iam.PolicyStatement(
+                    actions=["iam:CreateServiceLinkedRole"],
+                    resources=[
+                        f"arn:aws:iam::{self.account}:role/aws-service-role/sagemaker.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_SageMakerEndpoint"
+                    ],
+                    conditions={
+                        "StringLike": {
+                            "iam:AWSServiceName": "sagemaker.application-autoscaling.amazonaws.com"
+                        }
+                    },
+                )
+            )
+
             # Add permissions to enable/disable sagemaker pipeline stages
             products_use_role.add_to_principal_policy(
                 iam.PolicyStatement(
@@ -156,36 +149,55 @@ class ServiceCatalogStack(core.Stack):
                 )
             )
 
-            products_use_role.add_to_principal_policy(
-                iam.PolicyStatement(
-                    actions=["iam:CreateServiceLinkedRole"],
-                    resources=[
-                        f"arn:aws:iam::{self.account}:role/aws-service-role/sagemaker.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_SageMakerEndpoint"
-                    ],
-                    conditions={
-                        "StringLike": {
-                            "iam:AWSServiceName": "sagemaker.application-autoscaling.amazonaws.com"
-                        }
-                    },
-                )
-            )
-
-        # Create the launch role
-        products_launch_role_name = self.node.try_get_context(
-            "drift:ProductsLaunchRoleName"
-        )
-        products_launch_role = iam.Role.from_role_arn(
+        portfolio = servicecatalog.Portfolio(
             self,
-            "LaunchRole",
-            role_arn=f"arn:{self.partition}:iam::{self.account}:role/{products_launch_role_name}",
+            "Portfolio",
+            display_name=portfolio_name.value_as_string,
+            provider_name=portfolio_owner.value_as_string,
+            description="Organization templates for drift detection pipelines",
         )
 
-        # portfolio.give_access_to_role(
-        #     iam.Role.from_role_arn(
-        #         self, "execution_role_arn", role_arn=execution_role_arn.value_as_string
-        #     )
-        # )
+        batch_product = servicecatalog.CloudFormationProduct(
+            self,
+            "BatchProduct",
+            owner=portfolio_owner.value_as_string,
+            product_name="Amazon SageMaker drift detection template for batch scoring",
+            product_versions=[
+                servicecatalog.CloudFormationProductVersion(
+                    cloud_formation_template=servicecatalog.CloudFormationTemplate.from_asset(
+                        generate_template(
+                            stack=BatchPipelineStack,
+                            stack_name="drift-batch-pipeline",
+                            strip_policies=True,
+                        )
+                    ),
+                    product_version_name=product_version.value_as_string,
+                )
+            ],
+            description="This template includes a model building pipeline that includes a workflow to pre-process, train, evaluate and register a model as well as create a baseline for model monitoring.   The batch pipeline creates a staging and production workflow to perform scoring, and model monitor to output metrics to automate re-training on drift detection.",
+        )
 
+        deploy_product = servicecatalog.CloudFormationProduct(
+            self,
+            "DeployProduct",
+            owner=portfolio_owner.value_as_string,
+            product_name="Amazon SageMaker drift detection template for real-time deployment",
+            product_versions=[
+                servicecatalog.CloudFormationProductVersion(
+                    cloud_formation_template=servicecatalog.CloudFormationTemplate.from_asset(
+                        generate_template(
+                            stack=DeployPipelineStack,
+                            stack_name="drift-deploy-pipeline",
+                            strip_policies=True,
+                        )
+                    ),
+                    product_version_name=product_version.value_as_string,
+                )
+            ],
+            description="This template includes a model building pipeline that includes a workflow to pre-process, train, evaluate and register a model as well as create a baseline for model monitoring.   The deploy pipeline creates a staging and production endpoint, and schedules model monitor to output metrics to automate re-training on drift detection.",
+        )
+
+        # Create portfolio associate that depends on products
         portfolio_association = servicecatalog.CfnPortfolioPrincipalAssociation(
             self,
             "PortfolioPrincipalAssociation",
@@ -193,24 +205,31 @@ class ServiceCatalogStack(core.Stack):
             principal_arn=execution_role_arn.value_as_string,
             principal_type="IAM",
         )
-        portfolio_association.node.add_dependency(product)
+        portfolio_association.node.add_dependency(batch_product)
+        portfolio_association.node.add_dependency(deploy_product)
 
-        role_constraint = servicecatalog.CfnLaunchRoleConstraint(
-            self,
-            "LaunchRoleConstraint",
-            portfolio_id=portfolio.portfolio_id,
-            product_id=product.product_id,
-            role_arn=products_launch_role.role_arn,
-            description=f"Launch as {products_launch_role.role_arn}",
-        )
-        role_constraint.add_depends_on(portfolio_association)
+        # Add product tags, and create role constraint for each product
+        for i, product in enumerate([batch_product, deploy_product]):
+            portfolio.add_product(product)
+            core.Tags.of(product).add(key="sagemaker:studio-visibility", value="true")
+            role_constraint = servicecatalog.CfnLaunchRoleConstraint(
+                self,
+                f"LaunchRoleConstraint{i}",
+                portfolio_id=portfolio.portfolio_id,
+                product_id=product.product_id,
+                role_arn=products_launch_role.role_arn,
+                description=f"Launch as {products_launch_role.role_arn}",
+            )
+            role_constraint.add_depends_on(portfolio_association)
 
         # Create the build and deployment asset as an output to pass to pipeline stack
         build_asset = s3_assets.Asset(self, "BuildAsset", path="./build_pipeline")
+        batch_asset = s3_assets.Asset(self, "BatchAsset", path="./batch_pipeline")
         deploy_asset = s3_assets.Asset(
             self, "DeployAsset", path="./deployment_pipeline"
         )
         build_asset.grant_read(grantee=products_launch_role)
+        batch_asset.grant_read(grantee=products_launch_role)
         deploy_asset.grant_read(grantee=products_launch_role)
 
         # Output the deployment bucket and key, for input into pipeline stack
@@ -219,6 +238,9 @@ class ServiceCatalogStack(core.Stack):
         )
         self.export_ssm(
             "CodeCommitBuildKey", build_asset.s3_object_key, products_launch_role
+        )
+        self.export_ssm(
+            "CodeCommitBatchKey", batch_asset.s3_object_key, products_launch_role
         )
         self.export_ssm(
             "CodeCommitDeployKey", deploy_asset.s3_object_key, products_launch_role

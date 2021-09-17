@@ -46,7 +46,7 @@ def main(
     pipeline_definition_key = upload_pipeline(
         pipeline,
         default_bucket=artifact_bucket,
-        base_job_prefix=project_id,
+        base_job_prefix=f"{project_id}/build",
     )
 
     # Create App and stacks
