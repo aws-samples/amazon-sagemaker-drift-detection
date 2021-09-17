@@ -66,7 +66,7 @@ The MLOps Drift Detection template will create the following AWS services and re
 1. An [Amazon Simple Storage Service](https://aws.amazon.com/s3/) (Amazon S3) bucket is created for output model artifacts generated from the pipeline.
 
 2. Two repositories are added to [AWS CodeCommit](https://aws.amazon.com/codecommit/):
-  -  The first repository provides code to create a multi-step model building pipeline using [AWS CloudFormation](https://aws.amazon.com/cloudformation/).  The pipeline includes the following steps: data processing, model baseline, model training, model evaluation, and conditional model registration based on accuracy. The pipeline trains a linear regression model using the XGBoost algorithm on trip data from the [NYC Taxi Dataset](https://registry.opendata.aws/nyc-tlc-trip-records-pds/). This repository also includes the [drift-detection.ipynb](build_pipeline/drift-detection.ipynb) notebook to [Run the Pipeline](#run-the-pipeline) (see below)
+  -  The first repository provides code to create a multi-step model building pipeline using [AWS CloudFormation](https://aws.amazon.com/cloudformation/).  The pipeline includes the following steps: data processing, model baseline, model training, model evaluation, and conditional model registration based on accuracy. The pipeline trains a linear regression model using the XGBoost algorithm on trip data from the [NYC Taxi Dataset](https://registry.opendata.aws/nyc-tlc-trip-records-pds/). This repository also includes the [build-pipeline.ipynb](build_pipeline/build-pipeline.ipynb) notebook to [Run the Pipeline](#run-the-pipeline) (see below)
   - The second repository contains code and configuration files for model deployment and monitoring. This repo also uses [AWS CodePipeline](https://aws.amazon.com/codepipeline/) and [CodeBuild](https://aws.amazon.com/codebuild/), which run an [AWS CloudFormation](https://aws.amazon.com/cloudformation/) template to create model endpoints for staging and production.  This repository includes the [prod-config.json](deployment_pipeline/prod-config.json) configure to set metrics and threshold for drift detection.
 
 3. Two AWS CodePipeline pipelines:
@@ -96,7 +96,7 @@ Once your project is created, following the instructions to [Clone the Code Repo
 1. Choose **Repositories**, and in the **Local path** column for the repository that ends with *build*, choose **clone repo....**
 2. In the dialog box that appears, accept the defaults and choose **Clone repository**
 3. When clone of the repository is complete, the local path appears in the **Local path** column. Click on the path to open the local folder that contains the repository code in SageMaker Studio.
-4. Click on the [drift-detection.ipynb](build_pipeline/drift-detection.ipynb) file to open the notebook.
+4. Click on the [build-pipeline.ipynb](build_pipeline/build-pipeline.ipynb) file to open the notebook.
 
 In the notebook, provide the **Project Name** in the first cell to get started:
 
@@ -141,7 +141,7 @@ This section outlines cost considerations for running the Drift Detection Pipeli
 
 ## Cleaning Up
 
-The [drift-detection.ipynb](build_pipeline/drift-detection.ipynb) notebook includes cells that you can run to cleanup the resources. 
+The [build-pipeline.ipynb](build_pipeline/build-pipeline.ipynb) notebook includes cells that you can run to cleanup the resources.
 
 1. SageMaker prod endpoint
 2. SageMaker staging endpoint
