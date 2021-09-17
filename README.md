@@ -1,4 +1,4 @@
-# Amazon SageMaker Drift Detection Pipeline
+# Amazon SageMaker Drift Detection
 
 This sample demonstrates how to setup an Amazon SageMaker MLOps deployment pipeline for Drift detection
 
@@ -26,9 +26,9 @@ Follow are the list of the parameters.
 | PortfolioOwner     | The owner of the portfolio                     |
 | ProductVersion     | The product version to deploy                  |
 
-You can copy the the required `ExecutionRoleArn` role from the Studio dashboard.
+You can copy the the required `ExecutionRoleArn` role from your **User Details** in the SageMaker Studio dashboard.
 
-![Execution Role](docs/drift-execution-role.png)
+![Execution Role](docs/studio-execution-role.png)
 
 Alternatively see [BUILD.md](BUILD.md) for instructions on how to build the MLOps template from source.
 
@@ -39,21 +39,21 @@ Once your MLOps project template is registered in **AWS Service Catalog** you ca
 1. Switch back to the Launcher
 2. Click **New Project** from the **ML tasks and components** section.
 
-On the Create project page, SageMaker templates is chosen by default. This option lists the built-in templates. However, you want to use the template you published for the Amazon SageMaker Drift Detection Pipeline.
+On the Create project page, SageMaker templates is chosen by default. This option lists the built-in templates. However, you want to use the template you published for Amazon SageMaker drift detection.
 
-6. Choose **Organization templates**.
-7. Choose **Amazon SageMaker Drift Detection Pipeline**.
-8. Choose **Select project template**.
+3. Choose **Organization templates**.
+4. Choose **Amazon SageMaker drift detection template for real-time deployment**.
+5. Choose **Select project template**.
 
 ![Select Template](docs/drift-select-template.png)
 
 `NOTE`: If you have recently updated your AWS Service Catalog Project, you may need to refresh SageMaker Studio to ensure it picks up the latest version of your template.
 
-9. In the **Project details** section, for **Name**, enter **drift-pipeline**.
+6. In the **Project details** section, for **Name**, enter **drift-pipeline**.
   - The project name must have 32 characters or fewer.
-10. In the Project template parameters
-  - For **RetrainSchedule**, input a validate [Cron Schedule](https://docs.aws.amazon.com/sagemaker/latest/dg/model-monitor-schedule-expression.html) which defaults to `cron(0 12 1 * ? *)` - the first day of every month.
-11. Choose **Create project**.
+7. In the Project template parameter, for **RetrainSchedule**, input a validate [Cron Schedule](https://docs.aws.amazon.com/sagemaker/latest/dg/model-monitor-schedule-expression.html)
+  - This defaults to `cron(0 12 1 * ? *)` which is the first day of every month.
+8. Choose **Create project**.
 
 ![Create Project](docs/drift-create-project.png)
 
@@ -69,7 +69,7 @@ The MLOps Drift Detection template will create the following AWS services and re
   -  The first repository provides code to create a multi-step model building pipeline using [AWS CloudFormation](https://aws.amazon.com/cloudformation/).  The pipeline includes the following steps: data processing, model baseline, model training, model evaluation, and conditional model registration based on accuracy. The pipeline trains a linear regression model using the XGBoost algorithm on trip data from the [NYC Taxi Dataset](https://registry.opendata.aws/nyc-tlc-trip-records-pds/). This repository also includes the [drift-detection.ipynb](build_pipeline/drift-detection.ipynb) notebook to [Run the Pipeline](#run-the-pipeline) (see below)
   - The second repository contains code and configuration files for model deployment and monitoring. This repo also uses [AWS CodePipeline](https://aws.amazon.com/codepipeline/) and [CodeBuild](https://aws.amazon.com/codebuild/), which run an [AWS CloudFormation](https://aws.amazon.com/cloudformation/) template to create model endpoints for staging and production.  This repository includes the [prod-config.json](deployment_pipeline/prod-config.json) configure to set metrics and threshold for drift detection.
 
-3. Two CodePipeline pipelines:
+3. Two AWS CodePipeline pipelines:
   - The [model build pipeline](build_pipeline) creates or updates the pipeline definition and then starts a new execution with a custom [AWS Lambda](https://aws.amazon.com/lambda/) function whenever a new commit is made to the ModelBuild CodeCommit repository. The first time the CodePipeline is started, it will fail to complete expects input data to be uploaded to the Amazon S3 artifact bucket.
   - The [deployment pipeline](deployment_pipeline/README.md) automatically triggers whenever a new model version is added to the model registry and the status is marked as Approved. Models that are registered with Pending or Rejected statuses aren’t deployed.
 

@@ -27,19 +27,18 @@ if __name__ == "__main__":
 
     logger.debug("Reading test data.")
     test_path = "/opt/ml/processing/test/test.csv"
-    df = pd.read_csv(test_path, header=None)
+    df = pd.read_csv(test_path)
 
     logger.debug("Reading test data.")
-    y_test = df.iloc[:, 0].to_numpy()
-    df.drop(df.columns[0], axis=1, inplace=True)
-    X_test = xgboost.DMatrix(df.values)
+    y_test = df["fare_amount"].values
+    X_test = xgboost.DMatrix(df.drop("fare_amount", axis=1).values)
 
     logger.info("Performing predictions against test data.")
     predictions = model.predict(X_test)
 
     # See the regression metrics
     # see: https://docs.aws.amazon.com/sagemaker/latest/dg/model-monitor-model-quality-metrics.html
-    logger.debug("Calculating mean squared error.")
+    logger.debug("Calculating metrics.")
     mae = mean_absolute_error(y_test, predictions)
     mse = mean_squared_error(y_test, predictions)
     rmse = sqrt(mse)

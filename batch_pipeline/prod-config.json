@@ -1,0 +1,10 @@
+{
+    "stage_name": "prod",
+    "instance_count": 1,
+    "instance_type": "ml.m5.large",
+    "drift_config": {
+        "metric_name": "feature_baseline_drift_fare_amount",
+        "metric_threshold": 0.4,
+        "period": 3600
+    }
+}

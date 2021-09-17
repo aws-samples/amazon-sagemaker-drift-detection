@@ -148,11 +148,11 @@ class SageMakerStack(core.Stack):
                 self,
                 "DriftAlarm",
                 alarm_name=f"{endpoint_name}-threshold",
-                alarm_description="Schedule Metric > Threshold",
+                alarm_description="Schedule Drift Threshold",
                 metric_name=deployment_config.schedule_config.metric_name,
                 threshold=deployment_config.schedule_config.metric_threshold,
                 namespace="aws/sagemaker/Endpoints/data-metrics",
-                comparison_operator="GreaterThanThreshold",
+                comparison_operator=deployment_config.schedule_config.comparison_operator,
                 dimensions=[
                     cloudwatch.CfnAlarm.DimensionProperty(
                         name="Endpoint", value=endpoint.attr_endpoint_name
