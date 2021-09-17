@@ -37,7 +37,6 @@ class AutoScalingConfig:
         self.scale_out_cooldown = scale_out_cooldown
 
 
-# TODO: Rename this to DriftConfig and move schedule expression out
 class ScheduleConfig:
     def __init__(
         self,

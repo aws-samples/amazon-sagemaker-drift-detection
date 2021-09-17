@@ -1,6 +1,5 @@
 from aws_cdk import (
     core,
-    aws_cloudtrail as cloudtrail,
     aws_iam as iam,
     aws_s3 as s3,
 )
@@ -57,7 +56,6 @@ class PipelineStack(core.Stack):
             removal_policy=core.RemovalPolicy.DESTROY,
         )
 
-        # Create cloudtrail for this bucket (to ensure bucket has the right policy)
         core.CfnOutput(self, "ArtifactBucket", value=s3_artifact.bucket_name)
 
         # Get the service catalog role for all permssions (if None CDK will create new roles)

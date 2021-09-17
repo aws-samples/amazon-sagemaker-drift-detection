@@ -17,7 +17,6 @@ setuptools.setup(
     install_requires=[
         "boto3==1.18.14",
         "aws-cdk.core==1.116.0",
-        "aws-cdk.aws-cloudtrail==1.116.0",
         "aws_cdk.aws_codebuild==1.116.0",
         "aws_cdk.aws_codecommit==1.116.0",
         "aws_cdk.aws_codepipeline==1.116.0",
