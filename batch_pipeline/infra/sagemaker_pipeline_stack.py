@@ -55,11 +55,11 @@ class SageMakerPipelineStack(core.Stack):
                 self,
                 "DriftAlarm",
                 alarm_name=alarm_name,
-                alarm_description="Schedule Metric > Threshold",
+                alarm_description=f"Batch Drift Threshold",
                 metric_name=drift_config.metric_name,
                 threshold=drift_config.metric_threshold,
                 namespace="aws/sagemaker/ModelBuildingPipeline/data-metrics",
-                comparison_operator="GreaterThanThreshold",
+                comparison_operator=drift_config.comparison_operator,
                 dimensions=[
                     cloudwatch.CfnAlarm.DimensionProperty(
                         name="PipelineName", value=pipeline_name

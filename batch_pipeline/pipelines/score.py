@@ -38,11 +38,14 @@ if __name__ == "__main__":
 
     # Drop the first target column
     df = load_data(input_file_list)
-    X_test = xgboost.DMatrix(df.drop("fare_amount", axis=1).values)
+    target_col = "fare_amount"
+    X_test = xgboost.DMatrix(df.drop(target_col, axis=1).values)
 
     logger.info("Performing predictions against test data.")
     predictions = model.predict(X_test)
-    df["fare_amount_prediction"] = predictions
+
+    # Replace the target column with predictions, to allow comparing in model monitor
+    df[target_col] = predictions
 
     output_dir = "/opt/ml/processing/output"
     pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)

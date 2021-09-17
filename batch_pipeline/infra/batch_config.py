@@ -8,7 +8,6 @@ class DriftConfig:
         evaluation_periods: int = 1,
         datapoints_to_alarm: int = 1,
         statistic: str = "Average",
-        data_capture_sampling_percentage: float = 100,
     ):
         self.metric_name = metric_name
         self.metric_threshold = metric_threshold
@@ -17,7 +16,6 @@ class DriftConfig:
         self.datapoints_to_alarm = datapoints_to_alarm
         self.evaluation_periods = evaluation_periods
         self.statistic = statistic
-        self.data_capture_sampling_percentage = data_capture_sampling_percentage
 
 
 class BatchConfig:

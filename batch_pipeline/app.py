@@ -38,8 +38,6 @@ def create_pipeline(
 
     # Set the model package group to project name
     package_group_name = project_name
-    sagemaker_pipeline_name = f"{project_name}-batch-{stage_name}"
-    sagemaker_pipeline_description = f"Batch Pipeline for {stage_name}"
 
     # If we don't have a specific champion variant defined, get the latest approved
     if batch_config.model_package_version is None:
@@ -69,6 +67,10 @@ def create_pipeline(
     logger.info(f"Got pipeline exection arn: {pipeline_execution_arn}")
     model_uri = registry.get_model_artifact(pipeline_execution_arn)
     logger.info(f"Got model uri: {model_uri}")
+
+    # Set the sagemaker pipeline name and descrption with model version
+    sagemaker_pipeline_name = f"{project_name}-batch-{stage_name}"
+    sagemaker_pipeline_description = f"Batch Pipeline for {stage_name} model version: {batch_config.model_package_version}"
 
     # If we have drift configuration then get the baseline uri
     baseline_uri = None
