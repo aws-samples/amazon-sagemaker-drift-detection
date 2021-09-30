@@ -297,7 +297,7 @@ class PipelineStack(core.Stack):
 
 
 class BatchPipelineStack(PipelineStack):
-    """Creates a Pipelinf for real-time deployment"""
+    """Creates a Pipeline for batch deployment"""
 
     def __init__(
         self,
@@ -309,7 +309,7 @@ class BatchPipelineStack(PipelineStack):
 
 
 class DeployPipelineStack(PipelineStack):
-    """Creates a Pipelinf for real-time deployment"""
+    """Creates a Pipelinfe for real-time deployment"""
 
     def __init__(
         self,

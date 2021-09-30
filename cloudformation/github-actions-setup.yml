@@ -4,10 +4,7 @@ Description: Setup IAM user for GitHub Actions and IAM role for SageMaker
 Parameters:
   GitHubActionsUserName:
     Type: String
-    Default: github-actions-sagemaker-user
-  SageMakerRoleName:
-    Type: String
-    Default: github-actions-sagemaker-role
+    Default: github-actions-sagemaker
 
 Resources:
   GitHubActionsUser:
@@ -31,13 +28,13 @@ Resources:
           "SecretAccessKey":"${GitHubActionsUserAccessKey.SecretAccessKey}"
         }
 
-  # Permissions to perform cloudformation and assume pass SageMakerRole for autoscaling
+  # Permissions to put sagemaker resources to s3 bucket and run CloudFormation passing SageMaker role
   GitHubActionsDeployPolicy:
     Type: AWS::IAM::Policy
     Properties:
-      Roles:
-        - !Ref SageMakerRole
-      PolicyName: allow-github-actions-cloudformation-deploy
+      Users:
+        - !Ref GitHubActionsUser
+      PolicyName: allow-github-actions
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -48,34 +45,40 @@ Resources:
           - Action: "cloudformation:DeleteStack"
             Effect: Deny
             Resource: "*"
+          - Action:
+              - "s3:CreateBucket"
+              - "s3:GetBucket*"
+              - "s3:ListAllMyBuckets"
+              - "s3:ListBucket"
+              - "s3:GetObject*"
+              - "s3:PutObject*"
+            Effect: Allow
+            Resource: "arn:aws:s3:::sagemaker-*"
+          - Action:
+              - "sagemaker:Describe*"
+              - "sagemaker:List*"
+              - "sagemaker:Search"
+              - "sagemaker:StartPipelineExecution"
+            Effect: Allow
+            Resource: "*"
           - Action: "iam:PassRole"
             Effect: Allow
-            Resource: !GetAtt SageMakerRole.Arn
+            Resource: !Sub arn:aws:iam::${AWS::AccountId}:role/service-role/AmazonSageMakerServiceCatalogProductsUseRole
+          - Action:
+              - "lambda:*"
+            Effect: Allow
+            Resource: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:sagemaker-*"
 
-  SageMakerRole:
-    Type: AWS::IAM::Role
+  LambdaPolicy:
+    Type: AWS::IAM::Policy
     Properties:
-      RoleName: !Ref SageMakerRoleName
-      MaxSessionDuration: 43200 # 12 hours maximum duration
-      AssumeRolePolicyDocument:
+      Roles:
+        - AmazonSageMakerServiceCatalogProductsUseRole
+      PolicyName: allow-cloudwatch-alarms
+      PolicyDocument:
         Version: "2012-10-17"
         Statement:
-          - Effect: "Allow"
-            Principal:
-              Service:
-                - sagemaker.amazonaws.com
-            Action:
-              - "sts:AssumeRole"
-          - Effect: "Allow"
-            Principal:
-              AWS: !GetAtt GitHubActionsUser.Arn
-            Action:
-              - "sts:AssumeRole"
-              - "sts:TagSession"
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/AmazonS3FullAccess
-        - arn:aws:iam::aws:policy/AmazonSageMakerFullAccess
-
-Outputs:
-  SageMakerRoleArn:
-    Value: !GetAtt SageMakerRole.Arn
+          - Action:
+              - "cloudwatch:*"
+            Effect: Allow
+            Resource: !Sub "arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:sagemaker-*"

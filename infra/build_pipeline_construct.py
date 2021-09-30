@@ -146,7 +146,7 @@ class BuildPipelineConstruct(core.Construct):
         )
 
         # Load the start pipeline code
-        with open("lambda/build/lambda_start_pipeline.py", encoding="utf8") as fp:
+        with open("lambda/lambda_start_pipeline.py", encoding="utf8") as fp:
             lambda_start_pipeline_code = fp.read()
 
         lambda_start_pipeline = lambda_.Function(
@@ -288,7 +288,7 @@ class BuildPipelineConstruct(core.Construct):
         )
 
         # Load the lambda pipeline change code
-        with open("lambda/build/lambda_pipeline_change.py", encoding="utf8") as fp:
+        with open("lambda/lambda_pipeline_change.py", encoding="utf8") as fp:
             lambda_pipeline_change_code = fp.read()
 
         lambda_pipeline_change = lambda_.Function(

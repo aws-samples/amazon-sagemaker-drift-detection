@@ -20,6 +20,7 @@ setuptools.setup(
         "aws-cdk.aws-cloudwatch==1.116.0",
         "aws-cdk.aws-events==1.116.0",
         "aws-cdk.aws-iam==1.116.0",
+        "aws-cdk.aws-lambda==1.116.0",
         "aws-cdk.aws-sagemaker==1.116.0",
         "sagemaker==2.54.0",
     ],

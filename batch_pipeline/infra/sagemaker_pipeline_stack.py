@@ -1,14 +1,12 @@
 from aws_cdk import (
     core,
     aws_cloudwatch as cloudwatch,
-    aws_events as events,
     aws_iam as iam,
+    aws_lambda as lambda_,
     aws_sagemaker as sagemaker,
 )
 
 import logging
-import os
-from urllib.parse import urlparse
 from batch_config import DriftConfig
 
 logger = logging.getLogger(__name__)

@@ -36,19 +36,28 @@ aws secretsmanager get-secret-value \
   --output text
 ```
 
-The GitHub Actions workflow has three stages: Model build, Deploy to staging, and Deploy to production.  Each has their on [environment](https://docs.github.com/en/actions/reference/environments) which secrets and optional protection rules. 
-1. `development` This is the environment in which runs your Model Build and starts the SageMaker pipeline execution, and on completion it will publish a model to the Registry.  It is recommend you run this on `pull_request` and `push`.
-1. `staging` This second stage deploys your Staging endpoint.  It is recommend you run this on commit to the `development` branch and configure a *protection rule* to continue after you have approved the model in the SageMaker Model Registry.
-1. `prod` This final stage deploys you Production Endpoint. It is recommend you this on commit the `main` branch with a *protection rule* to require approval after Staging endpoint has been tested.
+### Jobs
 
-For each of the environments you will require setting up the following secrets.
-1. Create a secret named `AWS_REGION` defaulted to region `us-east-1`
-1. Create a secret named `AWS_ACCESS_KEY_ID` containing the `AccessKeyId` value returned above.
-1. Create a secret named `AWS_SECRET_ACCESS_KEY` containing in the `SecretAccessKey` value returned above.
-1. Create a secret named `AWS_SAGEMAKER_ROLE` containing the `SageMakerRoleArn` output in the setup stack.
+This sample includes a `Build and Deploy` [GitHub Actions](https://docs.github.com/en/actions/learn-github-actions/understanding-github-actions) workflow with contains the following jobs
+1. The `Build Model` job will create or update a SageMaker Model Build Pipeline using AWS CloudFormation.
+2. The `Batch` jobs will create or update a SageMaker Pipeline to run Batch Scoring for Staging and Production environments.
+3. The `Deploy` jobs will deploy SageMaker Endpoints to Staging and Production environments.
 
-If you configure *protection rules* for you environments, you will need to click **Review deployments** to approve the next stage as show below:
+These jobs are configured to run against a specific [environment](https://docs.github.com/en/actions/reference/environments) which contains both secrets and optional *protection rules*.
 
 ![Execution Role](docs/github-actions-workflow.png)
 
-When the workflow successfully completes, you will have both Endpoints deployed in staging and production, with drift detection enable which will trigger re-training on drift.
+### Environments
+
+1. `development` environment in which runs your `Build Model` job and starts the SageMaker pipeline execution.  On completion this pipeline will publish a model to the Registry.  It is recommend you run this on `pull_request` and `push` events.
+2. `staging` and `batch-staging` environments will enable you to run the `Batch` and `Deploy` jobs respectively in staging.
+  * You should configure a *protection rule* for data science team so this job is delayed until the latest model has been approved in the SageMaker model registry.
+  3. `prod` and `batch-prod` environments will enable you to run the `Batch` and `Deploy` jobs respectively in production.
+  * You should configure a *protection rule* for your operations team which will approve this only once they are happy that the staging environment has been tested.
+
+For each of the environments you will require setting up the following secrets.
+1. Create a secret named `AWS_ACCESS_KEY_ID` containing the `AccessKeyId` value returned above.
+1. Create a secret named `AWS_SECRET_ACCESS_KEY` containing in the `SecretAccessKey` value returned above.
+1. Create a secret named `AWS_SAGEMAKER_ROLE` containing the ARN for the `AmazonSageMakerServiceCatalogProductsUseRole` in your account.
+
+When the workflow successfully completes, drift detection is configured to trigger re-training on drift detection in the production batch pipeline or real-time endpoint.
