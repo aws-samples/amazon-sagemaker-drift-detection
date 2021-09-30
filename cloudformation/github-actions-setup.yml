@@ -82,3 +82,21 @@ Resources:
               - "cloudwatch:*"
             Effect: Allow
             Resource: !Sub "arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:sagemaker-*"
+          - Action:
+              - "cloudwatch:*"
+            Effect: Allow
+            Resource: !Sub "arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:sagemaker-*"
+          - Action:
+              - "application-autoscaling:DeregisterScalableTarget"
+              - "application-autoscaling:DeleteScalingPolicy"
+              - "application-autoscaling:DescribeScalingPolicies"
+              - "application-autoscaling:PutScalingPolicy"
+              - "application-autoscaling:DescribeScalingPolicies"
+              - "application-autoscaling:RegisterScalableTarget"
+              - "application-autoscaling:DescribeScalableTargets"
+              - "iam:CreateServiceLinkedRole"
+              - "cloudwatch:DeleteAlarms"
+              - "cloudwatch:DescribeAlarms"
+              - "cloudwatch:PutMetricAlarm"
+            Effect: Allow
+            Resource: "*"
