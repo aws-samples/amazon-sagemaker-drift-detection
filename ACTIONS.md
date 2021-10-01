@@ -5,12 +5,8 @@ This template repository contains a sample application and sample GitHub Actions
 This MLOps workflow demonstrates training and evaluating a machine learning model to predict taxi fare from the public [New York City Taxi dataset](https://registry.opendata.aws/nyc-tlc-trip-records-pds/) deployed with Amazon SageMaker. 
 
 This repository contains a number of start workflow files for GitHub Actions:
-1. [build-deploy-pipeline.yml](.github/workflows/build-deploy-pipeline.yml) This workflow runs when a pull request is opened or commit with the following stages:
-  * `build`: This workflow creates or updates the Sagemaker Pipeline, and starts an execution in the `development` environment.
-  * `deploy_staging`: This workflow deploys the SageMaker endpoint in the `staging` environment.
-  * `deploy_prod`: This workflow deploys the SageMaker endpoint with Model Monitor in the `prod` environment.
-1. [publish-template.yml](.github/workflows/publish-template.yml) runs when a new commit is pushed to the main branch in the `aws` environment:
-  * Synths and uploads the CFN templates and build & deploy assets for launching the stack.
+1. [build-deploy-pipeline.yml](.github/workflows/build-deploy-pipeline.yml) This workflow runs when a pull request is opened or pushed to the `main` branch (see below).
+1. [publish-template.yml](.github/workflows/publish-template.yml) runs when a new commit is pushed to the main branch in the `aws` environment.
 
 ## Create a GitHub repository from this template
 
@@ -36,7 +32,7 @@ aws secretsmanager get-secret-value \
   --output text
 ```
 
-### Jobs
+### Build Deploy Pipeline
 
 This sample includes a `Build and Deploy` [GitHub Actions](https://docs.github.com/en/actions/learn-github-actions/understanding-github-actions) workflow with contains the following jobs
 1. The `Build Model` job will create or update a SageMaker Model Build Pipeline using AWS CloudFormation.
