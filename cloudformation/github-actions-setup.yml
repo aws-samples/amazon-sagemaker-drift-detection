@@ -1,0 +1,102 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Setup IAM user for GitHub Actions and IAM role for SageMaker
+
+Parameters:
+  GitHubActionsUserName:
+    Type: String
+    Default: github-actions-sagemaker
+
+Resources:
+  GitHubActionsUser:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: !Ref GitHubActionsUserName
+
+  GitHubActionsUserAccessKey:
+    Type: AWS::IAM::AccessKey
+    Properties:
+      UserName: !Ref GitHubActionsUser
+      Serial: 1
+
+  GitHubActionsCredentials:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Ref GitHubActionsUserName
+      SecretString: !Sub |
+        {
+          "AccessKeyId":"${GitHubActionsUserAccessKey}",
+          "SecretAccessKey":"${GitHubActionsUserAccessKey.SecretAccessKey}"
+        }
+
+  # Permissions to put sagemaker resources to s3 bucket and run CloudFormation passing SageMaker role
+  GitHubActionsDeployPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      Users:
+        - !Ref GitHubActionsUser
+      PolicyName: allow-github-actions
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action:
+              - "cloudformation:*"
+            Effect: Allow
+            Resource: "*"
+          - Action: "cloudformation:DeleteStack"
+            Effect: Deny
+            Resource: "*"
+          - Action:
+              - "s3:CreateBucket"
+              - "s3:GetBucket*"
+              - "s3:ListAllMyBuckets"
+              - "s3:ListBucket"
+              - "s3:GetObject*"
+              - "s3:PutObject*"
+            Effect: Allow
+            Resource: "arn:aws:s3:::sagemaker-*"
+          - Action:
+              - "sagemaker:Describe*"
+              - "sagemaker:List*"
+              - "sagemaker:Search"
+              - "sagemaker:StartPipelineExecution"
+            Effect: Allow
+            Resource: "*"
+          - Action: "iam:PassRole"
+            Effect: Allow
+            Resource: !Sub arn:aws:iam::${AWS::AccountId}:role/service-role/AmazonSageMakerServiceCatalogProductsUseRole
+          - Action:
+              - "lambda:*"
+            Effect: Allow
+            Resource: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:sagemaker-*"
+
+  LambdaPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      Roles:
+        - AmazonSageMakerServiceCatalogProductsUseRole
+      PolicyName: allow-cloudwatch-alarms
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action:
+              - "cloudwatch:*"
+            Effect: Allow
+            Resource: !Sub "arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:sagemaker-*"
+          - Action:
+              - "cloudwatch:*"
+            Effect: Allow
+            Resource: !Sub "arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:sagemaker-*"
+          - Action:
+              - "application-autoscaling:DeregisterScalableTarget"
+              - "application-autoscaling:DeleteScalingPolicy"
+              - "application-autoscaling:DescribeScalingPolicies"
+              - "application-autoscaling:PutScalingPolicy"
+              - "application-autoscaling:DescribeScalingPolicies"
+              - "application-autoscaling:RegisterScalableTarget"
+              - "application-autoscaling:DescribeScalableTargets"
+              - "iam:CreateServiceLinkedRole"
+              - "cloudwatch:DeleteAlarms"
+              - "cloudwatch:DescribeAlarms"
+              - "cloudwatch:PutMetricAlarm"
+            Effect: Allow
+            Resource: "*"

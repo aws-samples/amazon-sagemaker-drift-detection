@@ -3,12 +3,12 @@ name: Publish Template to S3
 on:
   push:
     branches: [ main ]
-  pull_request:
-    branches: [ main ]
 
 jobs:
   synth-and-publish:
     runs-on: ubuntu-latest
+    environment:
+      name: aws # Target only the AWS environment to publish CFN templates
     defaults:
       run:
         shell: bash
@@ -19,8 +19,8 @@ jobs:
       - name: Setup Python environment
         uses: actions/setup-python@v2
         with:
-          python-version: "3.8" # Version range or exact version of a Python version to use, using SemVer's version range syntax
-          architecture: "x64" # optional x64 or x86. Defaults to x64 if not specified
+          python-version: "3.8"
+          architecture: "x64"
 
       - name: Setup Node 
         uses: actions/setup-node@v2
@@ -47,7 +47,7 @@ jobs:
         env:
           BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
           BUCKET_PREFIX: ${{ secrets.BUCKET_PREFIX }}
-        run: cdk synth drift-service-catalog --path-metadata false -c drift:ArtifactBucket=$BUCKET_NAME -c drift:ArtifactBucketPrefix=$BUCKET_PREFIX > drift-service-catalog.yml
+        run: cdk synth drift-service-catalog --path-metadata false -c drift:ArtifactBucket=$BUCKET_NAME -c drift:ArtifactBucketPrefix=$BUCKET_PREFIX > cloudformation/drift-service-catalog.yml
 
       - name: Publish Assets to S3
         env:
@@ -62,6 +62,6 @@ jobs:
           path: cdk.out/*.template.json
 
       - name: Print Template
-        run: cat drift-service-catalog.yml
+        run: cat cloudformation/drift-service-catalog.yml
 
 

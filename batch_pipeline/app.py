@@ -27,8 +27,8 @@ def create_pipeline(
     project_id: str,
     region: str,
     sagemaker_pipeline_role_arn: str,
+    lambda_role_arn: str,
     artifact_bucket: str,
-    evaluate_drift_function_arn: str,
     stage_name: str,
 ):
     # Get the stage specific deployment config for sagemaker
@@ -85,7 +85,7 @@ def create_pipeline(
         pipeline_name=sagemaker_pipeline_name,
         default_bucket=artifact_bucket,
         base_job_prefix=project_id,
-        evaluate_drift_function_arn=evaluate_drift_function_arn,
+        lambda_role_arn=lambda_role_arn,
         data_uri=data_uri,
         model_uri=model_uri,
         transform_uri=transform_uri,
@@ -98,8 +98,7 @@ def create_pipeline(
     parsed = json.loads(pipeline_definition_body)
     logger.info(json.dumps(parsed, indent=2, sort_keys=True))
 
-    # Upload the pipeline to S3 bucket/key and return JSON with key/value for for Cfn Stack parameters.
-    # see: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-sagemaker-pipeline.html
+    # Upload the pipeline to S3 bucket/key
     logger.info(f"Uploading {stage_name} pipeline to {artifact_bucket}")
     pipeline_definition_key = upload_pipeline(
         pipeline,
@@ -131,8 +130,8 @@ def main(
     project_id: str,
     region: str,
     sagemaker_pipeline_role_arn: str,
+    lambda_role_arn: str,
     artifact_bucket: str,
-    evaluate_drift_function_arn: str,
 ):
     # Create App and stacks
     app = core.App()
@@ -143,8 +142,8 @@ def main(
         project_id=project_id,
         region=region,
         sagemaker_pipeline_role_arn=sagemaker_pipeline_role_arn,
+        lambda_role_arn=lambda_role_arn,
         artifact_bucket=artifact_bucket,
-        evaluate_drift_function_arn=evaluate_drift_function_arn,
         stage_name="staging",
     )
 
@@ -154,8 +153,8 @@ def main(
         project_id=project_id,
         region=region,
         sagemaker_pipeline_role_arn=sagemaker_pipeline_role_arn,
+        lambda_role_arn=lambda_role_arn,
         artifact_bucket=artifact_bucket,
-        evaluate_drift_function_arn=evaluate_drift_function_arn,
         stage_name="prod",
     )
 
@@ -175,8 +174,8 @@ if __name__ == "__main__":
         default=os.environ.get("SAGEMAKER_PIPELINE_ROLE_ARN"),
     )
     parser.add_argument(
-        "--evaluate-drift-function-arn",
-        default=os.environ.get("EVALUATE_DRIFT_FUNCTION_ARN"),
+        "--lambda-role-arn",
+        default=os.environ.get("LAMBDA_ROLE_ARN"),
     )
     parser.add_argument(
         "--artifact-bucket",

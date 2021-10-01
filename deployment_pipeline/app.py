@@ -143,5 +143,5 @@ if __name__ == "__main__":
         default=os.environ.get("ARTIFACT_BUCKET"),
     )
     args = vars(parser.parse_args())
-    print("args: {}".format(args))
+    logger.info("args: {}".format(args))
     main(**args)

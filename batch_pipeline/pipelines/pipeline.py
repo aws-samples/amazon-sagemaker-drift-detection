@@ -73,7 +73,7 @@ def get_pipeline(
     pipeline_name: str,
     default_bucket: str,
     base_job_prefix: str,
-    evaluate_drift_function_arn: str,
+    lambda_role_arn: str,
     data_uri: str,
     model_uri: str,
     transform_uri: str,
@@ -241,10 +241,15 @@ def get_pipeline(
             cache_config=cache_config,
         )
 
-        # Create a lambda step that inspects the output of the model monitoring
+        # Create an inline lambda step that inspects the output of the model monitoring
         step_lambda = LambdaStep(
             name="EvaluateDrift",
-            lambda_func=Lambda(function_arn=evaluate_drift_function_arn),
+            lambda_func=Lambda(
+                function_name=f"sagemaker-{pipeline_name}",  # Must be <64 characters
+                execution_role_arn=lambda_role_arn,
+                script=os.path.join(BASE_DIR, "../lambda/lambda_evaluate_drift.py"),
+                handler="lambda_evaluate_drift.lambda_handler",
+            ),
             inputs={
                 "ProcessingJobName": step_monitor.properties.ProcessingJobName,
                 "PipelineName": pipeline_name,
@@ -255,8 +260,6 @@ def get_pipeline(
                 )
             ],
         )
-
-        # TODO: Fail workflow when statusCode==400
 
         steps += [step_monitor, step_lambda]
 

@@ -81,7 +81,7 @@ def get_pipeline(
     model_package_group_name,
     default_bucket,
     base_job_prefix,
-):
+) -> Pipeline:
     """Gets a SageMaker ML Pipeline instance working with on nyc taxi data.
     Args:
         region: AWS region to create and run the pipeline.
@@ -381,16 +381,12 @@ def get_pipeline(
     return pipeline
 
 
-def upload_pipeline(pipeline: Pipeline, default_bucket, base_job_prefix):
+def upload_pipeline(pipeline: Pipeline, default_bucket, base_job_prefix) -> str:
     # Get the pipeline definition
     pipeline_definition_body = pipeline.definition()
     # Upload the pipeline to a unique location in s3 based on git commit and timestamp
-    pipeline_name = name_from_base(f"{base_job_prefix}/pipeline")
+    pipeline_key = name_from_base(f"{base_job_prefix}/pipeline.json")
     S3Uploader.upload_string_as_file_body(
-        pipeline_definition_body, f"s3://{default_bucket}/{pipeline_name}.json"
+        pipeline_definition_body, f"s3://{default_bucket}/{pipeline_key}"
     )
-    # Return JSON with parameters used in Cfn Stack creation as template-configuration.json
-    return {
-        "PipelineDefinitionBucket": default_bucket,
-        "PipelineDefinitionKey": f"{pipeline_name}.json",
-    }
+    return pipeline_key
