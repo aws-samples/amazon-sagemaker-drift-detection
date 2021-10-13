@@ -215,7 +215,7 @@ Resources:
         - DisableTemplateValidation: false
           Info:
             LoadTemplateFromURL:
-              Fn::Sub: https://s3.${AWS::Region}.${AWS::URLSuffix}/amazon-sagemaker-safe-deployment-pipeline/drift-pipeline/6edb709d262fae7fa87e804ce71e852623727bad5285e329683e8362ba062004.json
+              Fn::Sub: https://s3.us-east-1.${AWS::URLSuffix}/amazon-sagemaker-safe-deployment-pipeline/drift-pipeline/6edb709d262fae7fa87e804ce71e852623727bad5285e329683e8362ba062004.json
           Name:
             Ref: ProductVersion
       Description: This template includes a model building pipeline that includes a workflow to pre-process, train, evaluate and register a model as well as create a baseline for model monitoring.   The batch pipeline creates a staging and production workflow to perform scoring, and model monitor to output metrics to automate re-training on drift detection.
@@ -232,7 +232,7 @@ Resources:
         - DisableTemplateValidation: false
           Info:
             LoadTemplateFromURL:
-              Fn::Sub: https://s3.${AWS::Region}.${AWS::URLSuffix}/amazon-sagemaker-safe-deployment-pipeline/drift-pipeline/c8f047b302590ff9ac8f9e1a19b18f91667571234566042fc26377e9f9a83a94.json
+              Fn::Sub: https://s3.us-east-1.${AWS::URLSuffix}/amazon-sagemaker-safe-deployment-pipeline/drift-pipeline/c8f047b302590ff9ac8f9e1a19b18f91667571234566042fc26377e9f9a83a94.json
           Name:
             Ref: ProductVersion
       Description: This template includes a model building pipeline that includes a workflow to pre-process, train, evaluate and register a model as well as create a baseline for model monitoring.   The deploy pipeline creates a staging and production endpoint, and schedules model monitor to output metrics to automate re-training on drift detection.
