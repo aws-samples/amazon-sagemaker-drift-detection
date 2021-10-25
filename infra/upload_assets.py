@@ -115,6 +115,21 @@ def upload_assets(cdk_dir: str = "cdk.out") -> None:
             upload_file(file_path, bucket_name, object_key, content_type)
 
 
+def strip_s3_region(template_name):
+    logger.info(f"Stripping region from: {template_name}")
+    # Backup the original template before creating a new version
+    template_backup = template_name + ".bak"
+    os.rename(template_name, template_backup)
+    with open(template_backup, "rt") as fin:
+        with open(template_name, "wt") as fout:
+            for line in fin:
+                # read replace the s3 region file
+                new_line = line.replace(
+                    "s3.${AWS::Region}.${AWS::URLSuffix}", "s3.${AWS::URLSuffix}"
+                )
+                fout.write(new_line)
+
+
 if __name__ == "__main__":
     ch = logging.StreamHandler()
     ch.setFormatter(logging.Formatter("%(levelname)s - %(message)s"))
@@ -122,6 +137,7 @@ if __name__ == "__main__":
     logger.info(f"Uploading assets for git ref: {GITHUB_REF} sha: {GITHUB_SHA}")
     # Upload YAML template
     template_name = "drift-service-catalog.yml"
+    strip_s3_region(template_name)
     object_key = f"{BUCKET_PREFIX}{template_name}"
     upload_file(template_name, BUCKET_NAME, object_key, "application/x-yaml")
     # Upload assets

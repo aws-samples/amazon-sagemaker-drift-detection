@@ -36,12 +36,12 @@ Resources:
                   - ""
                   - - "arn:"
                     - Ref: AWS::Partition
-                    - :s3:::amazon-sagemaker-safe-deployment-pipeline
+                    - :s3:::aws-ml-blog
               - Fn::Join:
                   - ""
                   - - "arn:"
                     - Ref: AWS::Partition
-                    - :s3:::amazon-sagemaker-safe-deployment-pipeline/*
+                    - :s3:::aws-ml-blog/*
           - Action:
               - ssm:DescribeParameters
               - ssm:GetParameters
@@ -215,7 +215,7 @@ Resources:
         - DisableTemplateValidation: false
           Info:
             LoadTemplateFromURL:
-              Fn::Sub: https://s3.${AWS::Region}.${AWS::URLSuffix}/amazon-sagemaker-safe-deployment-pipeline/drift-pipeline/6edb709d262fae7fa87e804ce71e852623727bad5285e329683e8362ba062004.json
+              Fn::Sub: https://s3.${AWS::URLSuffix}/aws-ml-blog/artifacts/amazon-sagemaker-drift-detection/fe4e6e939c884f6be729a386942e86bec0cdfb7b27f0f8e61e3b1e33c8b679cc.json
           Name:
             Ref: ProductVersion
       Description: This template includes a model building pipeline that includes a workflow to pre-process, train, evaluate and register a model as well as create a baseline for model monitoring.   The batch pipeline creates a staging and production workflow to perform scoring, and model monitor to output metrics to automate re-training on drift detection.
@@ -232,7 +232,7 @@ Resources:
         - DisableTemplateValidation: false
           Info:
             LoadTemplateFromURL:
-              Fn::Sub: https://s3.${AWS::Region}.${AWS::URLSuffix}/amazon-sagemaker-safe-deployment-pipeline/drift-pipeline/c8f047b302590ff9ac8f9e1a19b18f91667571234566042fc26377e9f9a83a94.json
+              Fn::Sub: https://s3.${AWS::URLSuffix}/aws-ml-blog/artifacts/amazon-sagemaker-drift-detection/a5523ad117867ab80983bc7cf31d32707c1483b1347bd9c1695c03e06b31440f.json
           Name:
             Ref: ProductVersion
       Description: This template includes a model building pipeline that includes a workflow to pre-process, train, evaluate and register a model as well as create a baseline for model monitoring.   The deploy pipeline creates a staging and production endpoint, and schedules model monitor to output metrics to automate re-training on drift detection.
@@ -304,25 +304,25 @@ Resources:
     Type: AWS::SSM::Parameter
     Properties:
       Type: String
-      Value: amazon-sagemaker-safe-deployment-pipeline
+      Value: aws-ml-blog
       Name: /drift-pipeline/CodeCommitSeedBucket
   CodeCommitBuildKey09FC7134:
     Type: AWS::SSM::Parameter
     Properties:
       Type: String
-      Value: drift-pipeline/36a64e18ab831be7cf4bb54b3ede196af47857106740f328a04819228f23255f.zip
+      Value: artifacts/amazon-sagemaker-drift-detection/52d936109e8943985b2da5ebaefc6bd41a7c6b5727626706bb58b5f4cc1edff2.zip
       Name: /drift-pipeline/CodeCommitBuildKey
   CodeCommitBatchKeyB0BCA7C9:
     Type: AWS::SSM::Parameter
     Properties:
       Type: String
-      Value: drift-pipeline/5e6059634c740b5fc9d17be06b07973b3700e8a0fee13f09af95935050e38dbf.zip
+      Value: artifacts/amazon-sagemaker-drift-detection/2f29abdac58c60544d6e912108fe61480ee7193137069b780f2327e9835d6204.zip
       Name: /drift-pipeline/CodeCommitBatchKey
   CodeCommitDeployKey5E5A6E47:
     Type: AWS::SSM::Parameter
     Properties:
       Type: String
-      Value: drift-pipeline/9105ab1926f9bb0d3d7bdb130559fd16074b1299df5e9f2515925ca77f75d1e6.zip
+      Value: artifacts/amazon-sagemaker-drift-detection/97454cab4d8ce952dd7a22409cf3789f4437f80b7449e2ad424776826bac3d2d.zip
       Name: /drift-pipeline/CodeCommitDeployKey
   CDKMetadata:
     Type: AWS::CDK::Metadata
