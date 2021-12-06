@@ -74,7 +74,8 @@ def create_endpoint(
     pipeline_execution_arn = registry.get_pipeline_execution_arn(
         deployment_config.variant_config.model_package_arn
     )
-    baseline_uri = registry.get_processing_output(pipeline_execution_arn)
+
+    baseline_uri = registry.get_data_check_baseline_uri(p["ModelPackageArn"])
     logger.info(f"Got baseline uri: {baseline_uri}")
 
     data_capture_uri = f"s3://{artifact_bucket}/{project_id}/datacapture"

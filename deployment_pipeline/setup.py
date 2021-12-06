@@ -15,7 +15,7 @@ setuptools.setup(
     package_dir={"": "infra"},
     packages=setuptools.find_packages(where="infra"),
     install_requires=[
-        "boto3==1.18.14",
+        "boto3==1.20.19",
         "aws-cdk.core==1.116.0",
         "aws-cdk.aws-iam==1.116.0",
         "aws-cdk.aws-sagemaker==1.116.0",
