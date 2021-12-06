@@ -246,35 +246,14 @@ class ModelRegistry:
         )
         return outputs["ModelArtifacts"]["S3ModelArtifacts"]
 
-    def get_processing_output(
-        self,
-        pipeline_execution_arn: str,
-        step_name: str = "BaselineJob",
-        output_name: str = "monitoring_output",
-    ):
-        """Returns a processing job output uri for a given step and output name.
-
-        Args:
-            pipeline_execution_arn: The pipeline execution arn
-            step_name: The optional processing step name
-            output_name: The output value to pick from the processing job
-
-        Returns:
-            The output from the processing job
-        """
-
-        steps = self.sm_client.list_pipeline_execution_steps(
-            PipelineExecutionArn=pipeline_execution_arn
-        )["PipelineExecutionSteps"]
-        processing_job_arn = [
-            s["Metadata"]["ProcessingJob"]["Arn"]
-            for s in steps
-            if s["StepName"] == step_name
-        ][0]
-        processing_job_name = processing_job_arn.split("/")[-1]
-        outputs = self.sm_client.describe_processing_job(
-            ProcessingJobName=processing_job_name
-        )["ProcessingOutputConfig"]["Outputs"]
-        return [
-            o["S3Output"]["S3Uri"] for o in outputs if o["OutputName"] == output_name
-        ][0]
+    def get_data_check_baseline_uri(self, model_package_arn: str):
+        try:
+            model_details = self.sm_client.describe_model_package(ModelPackageName=model_package_arn)
+            print(model_details)
+            baseline_uri = model_details['DriftCheckBaselines']['ModelDataQuality']['Constraints']['S3Uri']
+            baseline_uri = baseline_uri.replace('/constraints.json','') # returning the folder containing constraints and statistics
+            return baseline_uri
+        except ClientError as e:
+            error_message = e.response["Error"]["Message"]
+            logger.error(error_message)
+            raise Exception(error_message)
