@@ -40,6 +40,16 @@ from sagemaker.workflow.steps import (
     ProcessingStep,
     CacheConfig,
 )
+from sagemaker.workflow.quality_check_step import (
+    DataQualityCheckConfig,
+    ModelQualityCheckConfig,
+    QualityCheckStep,
+)
+from sagemaker.drift_check_baselines import DriftCheckBaselines
+from sagemaker.workflow.check_job_config import CheckJobConfig
+from sagemaker.workflow.step_collections import RegisterModel
+from sagemaker.workflow.functions import Join
+from sagemaker.workflow.execution_variables import ExecutionVariables
 from sagemaker.utils import name_from_base
 
 
@@ -180,85 +190,47 @@ def get_pipeline(
 
     steps = [step_create_model, step_score]
 
-    if baseline_uri is not None:
-        # Get the default model monitor container
-        model_monitor_container_uri = sagemaker.image_uris.retrieve(
-            framework="model-monitor",
-            region=region,
-            version="latest",
-        )
-
-        # Create the baseline job using
-        dataset_format = DatasetFormat.csv()
-        env = {
-            "dataset_format": json.dumps(dataset_format),
-            "dataset_source": "/opt/ml/processing/input/baseline_dataset_input",
-            "output_path": "/opt/ml/processing/output",
-            "publish_cloudwatch_metrics": "Disabled",
-            "baseline_constraints": "/opt/ml/processing/baseline/constraints/constraints.json",
-            "baseline_statistics": "/opt/ml/processing/baseline/stats/statistics.json",
-        }
-
-        monitor_analyzer = Processor(
-            image_uri=model_monitor_container_uri,
+    if baseline_uri is not None:        
+        check_job_config = CheckJobConfig(
             role=role,
             instance_count=monitor_instance_count,
             instance_type=monitor_instance_type,
-            base_job_name=f"{base_job_prefix}/monitoring",
             sagemaker_session=sagemaker_session,
-            max_runtime_in_seconds=1800,
-            env=env,
+            base_job_name=f"{base_job_prefix}/monitoring",
+            env = {
+                "PipelineName": pipeline_name,
+                "Region": region,
+            }
         )
 
-        step_monitor = ProcessingStep(
+        data_quality_check_config = DataQualityCheckConfig(
+            baseline_dataset=step_score.properties.ProcessingOutputConfig.Outputs["scores"].S3Output.S3Uri,
+            dataset_format=DatasetFormat.csv(header=True),
+            output_s3_uri=Join(
+                on="/",
+                values=[
+                    "s3:/",
+                    default_bucket,
+                    base_job_prefix,
+                    ExecutionVariables.PIPELINE_EXECUTION_ID,
+                    "dataqualitycheckstep",
+                ],
+            ),
+            post_analytics_processor_script='pipelines/postprocess_monitor_script.py',
+        )
+
+        step_monitor = QualityCheckStep(
             name="ModelMonitor",
-            processor=monitor_analyzer,
-            inputs=[
-                ProcessingInput(
-                    source=step_score.properties.ProcessingOutputConfig.Outputs[
-                        "scores"
-                    ].S3Output.S3Uri,
-                    destination="/opt/ml/processing/input/baseline_dataset_input",
-                    input_name="baseline_dataset_input",
-                ),
-                ProcessingInput(
-                    source=os.path.join(baseline_uri, "constraints.json"),
-                    destination="/opt/ml/processing/baseline/constraints",
-                    input_name="constraints",
-                ),
-                ProcessingInput(
-                    source=os.path.join(baseline_uri, "statistics.json"),
-                    destination="/opt/ml/processing/baseline/stats",
-                    input_name="baseline",
-                ),
-            ],
-            outputs=[
-                ProcessingOutput(
-                    source="/opt/ml/processing/output",
-                    output_name="monitoring_output",
-                ),
-            ],
+            skip_check=False,
+            register_new_baseline=False,
+            quality_check_config=data_quality_check_config,
+            check_job_config=check_job_config,
+            supplied_baseline_statistics=os.path.join(baseline_uri, "statistics.json"),
+            supplied_baseline_constraints=os.path.join(baseline_uri, "constraints.json"),
             cache_config=cache_config,
         )
 
-        # Create a lambda step that inspects the output of the model monitoring
-        step_lambda = LambdaStep(
-            name="EvaluateDrift",
-            lambda_func=Lambda(function_arn=evaluate_drift_function_arn),
-            inputs={
-                "ProcessingJobName": step_monitor.properties.ProcessingJobName,
-                "PipelineName": pipeline_name,
-            },
-            outputs=[
-                LambdaOutput(
-                    output_name="statusCode", output_type=LambdaOutputTypeEnum.Integer
-                )
-            ],
-        )
-
-        # TODO: Fail workflow when statusCode==400
-
-        steps += [step_monitor, step_lambda]
+        steps += [step_monitor]
 
     # pipeline instance
     pipeline = Pipeline(
