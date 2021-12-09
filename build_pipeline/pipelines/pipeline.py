@@ -205,7 +205,7 @@ def get_pipeline(
     )
 
     step_baseline = QualityCheckStep(
-        name="BaselineJob",
+        name="DataQualityBaselineJob",
         skip_check=True,
         register_new_baseline=True,
         quality_check_config=data_quality_check_config,
