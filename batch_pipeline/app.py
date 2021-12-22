@@ -75,7 +75,7 @@ def create_pipeline(
     # If we have drift configuration then get the baseline uri
     baseline_uri = None
     if batch_config.drift_config is not None:
-        baseline_uri = registry.get_processing_output(pipeline_execution_arn)
+        baseline_uri = registry.get_data_check_baseline_uri(batch_config.model_package_arn)
         logger.info(f"Got baseline uri: {baseline_uri}")
 
     # Create batch pipeline
