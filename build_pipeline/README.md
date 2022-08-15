@@ -3,6 +3,8 @@
 
 This folder contains the code to create a model build pipeline that includes a SageMaker Baseline and Training Job.
 
+To exercise this pipeline open the [build-pipeline.ipynb](build-pipeline.ipynb)
+
 ## Build Pipeline
 
 The model build pipeline contains three stages:

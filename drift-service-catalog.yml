@@ -21,107 +21,6 @@ Parameters:
     Description: The product version to deploy
     MinLength: 1
 Resources:
-  Portfolio856A4190:
-    Type: AWS::ServiceCatalog::Portfolio
-    Properties:
-      DisplayName:
-        Ref: PortfolioName
-      ProviderName:
-        Ref: PortfolioOwner
-      Description: Organization templates for Drift Detection pipeline
-  PortfolioPortfolioProductAssociation0d79f0ac3bc7766D6CD6:
-    Type: AWS::ServiceCatalog::PortfolioProductAssociation
-    Properties:
-      PortfolioId:
-        Ref: Portfolio856A4190
-      ProductId:
-        Ref: Product896941B4
-  Product896941B4:
-    Type: AWS::ServiceCatalog::CloudFormationProduct
-    Properties:
-      Name: Amazon Sagemaker Drift Detection Pipeline
-      Owner:
-        Ref: PortfolioOwner
-      ProvisioningArtifactParameters:
-        - DisableTemplateValidation: false
-          Info:
-            LoadTemplateFromURL:
-              Fn::Sub: https://s3.${AWS::Region}.${AWS::URLSuffix}/amazon-sagemaker-safe-deployment-pipeline/drift/995c5412ab943fce18ceaf3ebe66d305f8ab054a4a3f643768722c3fead226a0.json
-          Name:
-            Ref: ProductVersion
-      Description: Amazon SageMaker Project for a build and deployment pipeline that triggers on drift or schedule
-      Tags:
-        - Key: sagemaker:studio-visibility
-          Value: "true"
-  ProductsUseRolePolicy7FB0EE21:
-    Type: AWS::IAM::Policy
-    Properties:
-      PolicyDocument:
-        Statement:
-          - Action: sts:AssumeRole
-            Effect: Allow
-            Resource:
-              Fn::Join:
-                - ""
-                - - "arn:"
-                  - Ref: AWS::Partition
-                  - ":iam::"
-                  - Ref: AWS::AccountId
-                  - :role/service-role/AmazonSageMakerServiceCatalogProductsUseRole
-          - Action:
-              - application-autoscaling:DeregisterScalableTarget
-              - application-autoscaling:DeleteScalingPolicy
-              - application-autoscaling:DescribeScalingPolicies
-              - application-autoscaling:PutScalingPolicy
-              - application-autoscaling:RegisterScalableTarget
-              - application-autoscaling:DescribeScalableTargets
-              - iam:CreateServiceLinkedRole
-              - cloudwatch:DeleteAlarms
-              - cloudwatch:DescribeAlarms
-              - cloudwatch:PutMetricAlarm
-              - codepipeline:PutJobSuccessResult
-              - codepipeline:PutJobFailureResult
-            Effect: Allow
-            Resource: "*"
-          - Action:
-              - codepipeline:EnableStageTransition
-              - codepipeline:DisableStageTransition
-            Effect: Allow
-            Resource:
-              Fn::Join:
-                - ""
-                - - "arn:aws:codepipeline:"
-                  - Ref: AWS::Region
-                  - ":"
-                  - Ref: AWS::AccountId
-                  - :sagemaker-*
-          - Action:
-              - events:EnableRule
-              - events:DisableRule
-            Effect: Allow
-            Resource:
-              Fn::Join:
-                - ""
-                - - "arn:aws:events:"
-                  - Ref: AWS::Region
-                  - ":"
-                  - Ref: AWS::AccountId
-                  - :rule/sagemaker-*
-          - Action: iam:CreateServiceLinkedRole
-            Condition:
-              StringLike:
-                iam:AWSServiceName: sagemaker.application-autoscaling.amazonaws.com
-            Effect: Allow
-            Resource:
-              Fn::Join:
-                - ""
-                - - "arn:aws:iam::"
-                  - Ref: AWS::AccountId
-                  - :role/aws-service-role/sagemaker.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_SageMakerEndpoint
-        Version: "2012-10-17"
-      PolicyName: ProductsUseRolePolicy7FB0EE21
-      Roles:
-        - AmazonSageMakerServiceCatalogProductsUseRole
   LaunchRolePolicyA9E2E5B1:
     Type: AWS::IAM::Policy
     Properties:
@@ -137,12 +36,12 @@ Resources:
                   - ""
                   - - "arn:"
                     - Ref: AWS::Partition
-                    - :s3:::amazon-sagemaker-safe-deployment-pipeline
+                    - :s3:::aws-ml-blog
               - Fn::Join:
                   - ""
                   - - "arn:"
                     - Ref: AWS::Partition
-                    - :s3:::amazon-sagemaker-safe-deployment-pipeline/*
+                    - :s3:::aws-ml-blog/*
           - Action:
               - ssm:DescribeParameters
               - ssm:GetParameters
@@ -193,11 +92,153 @@ Resources:
                   - ":"
                   - Ref: AWS::AccountId
                   - :parameter
+                  - Ref: CodeCommitBatchKeyB0BCA7C9
+          - Action:
+              - ssm:DescribeParameters
+              - ssm:GetParameters
+              - ssm:GetParameter
+              - ssm:GetParameterHistory
+            Effect: Allow
+            Resource:
+              Fn::Join:
+                - ""
+                - - "arn:"
+                  - Ref: AWS::Partition
+                  - ":ssm:"
+                  - Ref: AWS::Region
+                  - ":"
+                  - Ref: AWS::AccountId
+                  - :parameter
                   - Ref: CodeCommitDeployKey5E5A6E47
         Version: "2012-10-17"
       PolicyName: LaunchRolePolicyA9E2E5B1
       Roles:
         - AmazonSageMakerServiceCatalogProductsLaunchRole
+  ProductsUseRolePolicy7FB0EE21:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Resource:
+              Fn::Join:
+                - ""
+                - - "arn:"
+                  - Ref: AWS::Partition
+                  - ":iam::"
+                  - Ref: AWS::AccountId
+                  - :role/service-role/AmazonSageMakerServiceCatalogProductsUseRole
+          - Action:
+              - application-autoscaling:DeregisterScalableTarget
+              - application-autoscaling:DeleteScalingPolicy
+              - application-autoscaling:DescribeScalingPolicies
+              - application-autoscaling:PutScalingPolicy
+              - application-autoscaling:RegisterScalableTarget
+              - application-autoscaling:DescribeScalableTargets
+              - iam:CreateServiceLinkedRole
+              - cloudwatch:DeleteAlarms
+              - cloudwatch:DescribeAlarms
+              - cloudwatch:PutMetricAlarm
+              - codepipeline:PutJobSuccessResult
+              - codepipeline:PutJobFailureResult
+            Effect: Allow
+            Resource: "*"
+          - Action: iam:CreateServiceLinkedRole
+            Condition:
+              StringLike:
+                iam:AWSServiceName: sagemaker.application-autoscaling.amazonaws.com
+            Effect: Allow
+            Resource:
+              Fn::Join:
+                - ""
+                - - "arn:aws:iam::"
+                  - Ref: AWS::AccountId
+                  - :role/aws-service-role/sagemaker.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_SageMakerEndpoint
+          - Action:
+              - codepipeline:EnableStageTransition
+              - codepipeline:DisableStageTransition
+            Effect: Allow
+            Resource:
+              Fn::Join:
+                - ""
+                - - "arn:aws:codepipeline:"
+                  - Ref: AWS::Region
+                  - ":"
+                  - Ref: AWS::AccountId
+                  - :sagemaker-*
+          - Action:
+              - events:EnableRule
+              - events:DisableRule
+            Effect: Allow
+            Resource:
+              Fn::Join:
+                - ""
+                - - "arn:aws:events:"
+                  - Ref: AWS::Region
+                  - ":"
+                  - Ref: AWS::AccountId
+                  - :rule/sagemaker-*
+        Version: "2012-10-17"
+      PolicyName: ProductsUseRolePolicy7FB0EE21
+      Roles:
+        - AmazonSageMakerServiceCatalogProductsUseRole
+  Portfolio856A4190:
+    Type: AWS::ServiceCatalog::Portfolio
+    Properties:
+      DisplayName:
+        Ref: PortfolioName
+      ProviderName:
+        Ref: PortfolioOwner
+      Description: Organization templates for drift detection pipelines
+  PortfolioPortfolioProductAssociationafa25c91024062989E0C:
+    Type: AWS::ServiceCatalog::PortfolioProductAssociation
+    Properties:
+      PortfolioId:
+        Ref: Portfolio856A4190
+      ProductId:
+        Ref: BatchProduct9E7E43C3
+  PortfolioPortfolioProductAssociation7d95b807a437095C0A65:
+    Type: AWS::ServiceCatalog::PortfolioProductAssociation
+    Properties:
+      PortfolioId:
+        Ref: Portfolio856A4190
+      ProductId:
+        Ref: DeployProduct78C47E65
+  BatchProduct9E7E43C3:
+    Type: AWS::ServiceCatalog::CloudFormationProduct
+    Properties:
+      Name: Amazon SageMaker drift detection template for batch scoring
+      Owner:
+        Ref: PortfolioOwner
+      ProvisioningArtifactParameters:
+        - DisableTemplateValidation: false
+          Info:
+            LoadTemplateFromURL:
+              Fn::Sub: https://s3.${AWS::URLSuffix}/aws-ml-blog/artifacts/amazon-sagemaker-drift-detection/fe4e6e939c884f6be729a386942e86bec0cdfb7b27f0f8e61e3b1e33c8b679cc.json
+          Name:
+            Ref: ProductVersion
+      Description: This template includes a model building pipeline that includes a workflow to pre-process, train, evaluate and register a model as well as create a baseline for model monitoring.   The batch pipeline creates a staging and production workflow to perform scoring, and model monitor to output metrics to automate re-training on drift detection.
+      Tags:
+        - Key: sagemaker:studio-visibility
+          Value: "true"
+  DeployProduct78C47E65:
+    Type: AWS::ServiceCatalog::CloudFormationProduct
+    Properties:
+      Name: Amazon SageMaker drift detection template for real-time deployment
+      Owner:
+        Ref: PortfolioOwner
+      ProvisioningArtifactParameters:
+        - DisableTemplateValidation: false
+          Info:
+            LoadTemplateFromURL:
+              Fn::Sub: https://s3.${AWS::URLSuffix}/aws-ml-blog/artifacts/amazon-sagemaker-drift-detection/a5523ad117867ab80983bc7cf31d32707c1483b1347bd9c1695c03e06b31440f.json
+          Name:
+            Ref: ProductVersion
+      Description: This template includes a model building pipeline that includes a workflow to pre-process, train, evaluate and register a model as well as create a baseline for model monitoring.   The deploy pipeline creates a staging and production endpoint, and schedules model monitor to output metrics to automate re-training on drift detection.
+      Tags:
+        - Key: sagemaker:studio-visibility
+          Value: "true"
   PortfolioPrincipalAssociation:
     Type: AWS::ServiceCatalog::PortfolioPrincipalAssociation
     Properties:
@@ -207,14 +248,40 @@ Resources:
         Ref: ExecutionRoleArn
       PrincipalType: IAM
     DependsOn:
-      - Product896941B4
-  LaunchRoleConstraint:
+      - BatchProduct9E7E43C3
+      - DeployProduct78C47E65
+  LaunchRoleConstraint0:
     Type: AWS::ServiceCatalog::LaunchRoleConstraint
     Properties:
       PortfolioId:
         Ref: Portfolio856A4190
       ProductId:
-        Ref: Product896941B4
+        Ref: BatchProduct9E7E43C3
+      Description:
+        Fn::Join:
+          - ""
+          - - "Launch as arn:"
+            - Ref: AWS::Partition
+            - ":iam::"
+            - Ref: AWS::AccountId
+            - :role/service-role/AmazonSageMakerServiceCatalogProductsLaunchRole
+      RoleArn:
+        Fn::Join:
+          - ""
+          - - "arn:"
+            - Ref: AWS::Partition
+            - ":iam::"
+            - Ref: AWS::AccountId
+            - :role/service-role/AmazonSageMakerServiceCatalogProductsLaunchRole
+    DependsOn:
+      - PortfolioPrincipalAssociation
+  LaunchRoleConstraint1:
+    Type: AWS::ServiceCatalog::LaunchRoleConstraint
+    Properties:
+      PortfolioId:
+        Ref: Portfolio856A4190
+      ProductId:
+        Ref: DeployProduct78C47E65
       Description:
         Fn::Join:
           - ""
@@ -237,24 +304,30 @@ Resources:
     Type: AWS::SSM::Parameter
     Properties:
       Type: String
-      Value: amazon-sagemaker-safe-deployment-pipeline
+      Value: aws-ml-blog
       Name: /drift-pipeline/CodeCommitSeedBucket
   CodeCommitBuildKey09FC7134:
     Type: AWS::SSM::Parameter
     Properties:
       Type: String
-      Value: drift/be4dfed42e0626f2201f8ce29518fb4e31fb640eca88a156fedc5b8d568c6c1c.zip
+      Value: artifacts/amazon-sagemaker-drift-detection/52d936109e8943985b2da5ebaefc6bd41a7c6b5727626706bb58b5f4cc1edff2.zip
       Name: /drift-pipeline/CodeCommitBuildKey
+  CodeCommitBatchKeyB0BCA7C9:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Type: String
+      Value: artifacts/amazon-sagemaker-drift-detection/2f29abdac58c60544d6e912108fe61480ee7193137069b780f2327e9835d6204.zip
+      Name: /drift-pipeline/CodeCommitBatchKey
   CodeCommitDeployKey5E5A6E47:
     Type: AWS::SSM::Parameter
     Properties:
       Type: String
-      Value: drift/381262eab49cfaf013c17daf9216232c25761d7f0ec33583681b6b699adf4ecf.zip
+      Value: artifacts/amazon-sagemaker-drift-detection/97454cab4d8ce952dd7a22409cf3789f4437f80b7449e2ad424776826bac3d2d.zip
       Name: /drift-pipeline/CodeCommitDeployKey
   CDKMetadata:
     Type: AWS::CDK::Metadata
     Properties:
-      Analytics: v2:deflate64:H4sIAAAAAAAAE3WQwU7EMAxEv2XvaXar5cARthKnPVTlCyzX7Zq2MUoc0Krqv5O0SBQJTvEkk3kal7YsH+zp8ASfocB2OM4onuz8qoCDqTpXg4eJlLx5DoE03ffselOJC+ojqmkoSPRI2byfk6NlZXGLydlzIP/BSAgKo/R2rsVrJyPLSvlT1F7ahEhgQYacZapRYvsiflrlt2HF/fewS2OH/A7jr7zOXSE6vDUy0lYK2OliwrmAXDjYtXfS9hJxIL1AIMMw5QYj431j5Cl9ClNeXQL1P3vbL3FZFlPf9SbueLaPtjwd3gJz4aNTnsg22/kFLKE7OZUBAAA=
+      Analytics: v2:deflate64:H4sIAAAAAAAAE3VQQWrDQAx8S+7rTUwg9NjG0FMPxn2BkGVHtb0qu9qGYPz37tqlTaE9ScMMo9GUtixP9rB7hGsosB32M4onO78q4GCqztXgYSIlbxoKEj2SeQqBNAl6dr2pxAX1ETWLvyVpT0TLyuIWk71nhsnOtYyMt9V33RYTyH8wEoLCKH1WeO0SJ5voL1B7adPBFEOQIZ8w1SixfRY/rfBLsKb4j7hzY4f8DuMvv869QHR4aWSk7UVgpynusYD8frBrCwnbc8SB9AyBTAhTri459j+93Ze4LIupb3oRtz/aB1sedm+BufDRKU9km21+Ai9p+LOVAQAA
     Condition: CDKMetadataAvailable
 Conditions:
   CDKMetadataAvailable:

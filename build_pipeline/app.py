@@ -51,7 +51,7 @@ def main(
     pipeline_location = upload_pipeline(
         pipeline,
         default_bucket=artifact_bucket,
-        base_job_prefix=project_id,
+        base_job_prefix=f"{project_id}/build",
     )
 
     # Store parameters as template-config.json used in the next CodePipeline step to create the SageMakerPipelineStack.

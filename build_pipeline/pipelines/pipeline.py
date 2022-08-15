@@ -46,7 +46,16 @@ from sagemaker.workflow.steps import (
     TrainingStep,
     CacheConfig,
 )
+from sagemaker.workflow.quality_check_step import (
+    DataQualityCheckConfig,
+    ModelQualityCheckConfig,
+    QualityCheckStep,
+)
+from sagemaker.drift_check_baselines import DriftCheckBaselines
+from sagemaker.workflow.check_job_config import CheckJobConfig
 from sagemaker.workflow.step_collections import RegisterModel
+from sagemaker.workflow.functions import Join
+from sagemaker.workflow.execution_variables import ExecutionVariables
 from sagemaker.utils import name_from_base
 
 
@@ -133,7 +142,7 @@ def get_pipeline(
     )
 
     # Create cache configuration (Unable to pass parameter for expire_after value)
-    cache_config = CacheConfig(enable_caching=True, expire_after="PT1H")
+    cache_config = CacheConfig(enable_caching=False, expire_after="PT1H")
 
     # processing step for feature engineering
     sklearn_processor = SKLearnProcessor(
@@ -172,57 +181,39 @@ def get_pipeline(
         code=os.path.join(BASE_DIR, "preprocess.py"),
         cache_config=cache_config,
     )
-
-    # baseline job step
-    # Get the default model monitor container
-    model_monitor_container_uri = sagemaker.image_uris.retrieve(
-        framework="model-monitor",
-        region=region,
-        version="latest",
-    )
-
-    # Create the baseline job using
-    dataset_format = DatasetFormat.csv()
-    env = {
-        "dataset_format": json.dumps(dataset_format),
-        "dataset_source": "/opt/ml/processing/input/baseline_dataset_input",
-        "output_path": "/opt/ml/processing/output",
-        "publish_cloudwatch_metrics": "Disabled",
-    }
-
-    monitor_analyzer = Processor(
-        image_uri=model_monitor_container_uri,
+    
+    check_job_config = CheckJobConfig(
         role=role,
         instance_count=1,
         instance_type=baseline_instance_type,
-        base_job_name=f"{base_job_prefix}/monitoring",
         sagemaker_session=sagemaker_session,
-        max_runtime_in_seconds=1800,
-        env=env,
     )
 
-    step_baseline = ProcessingStep(
-        name="BaselineJob",
-        processor=monitor_analyzer,
-        inputs=[
-            ProcessingInput(
-                source=step_process.properties.ProcessingOutputConfig.Outputs[
-                    "baseline"
-                ].S3Output.S3Uri,
-                destination="/opt/ml/processing/input/baseline_dataset_input",
-                input_name="baseline_dataset_input",
-            ),
-        ],
-        outputs=[
-            ProcessingOutput(
-                source="/opt/ml/processing/output",
-                # destination=baseline_output, # Use default output
-                output_name="monitoring_output",
-            ),
-        ],
+    data_quality_check_config = DataQualityCheckConfig(
+        baseline_dataset=step_process.properties.ProcessingOutputConfig.Outputs["baseline"].S3Output.S3Uri,
+        dataset_format=DatasetFormat.csv(),
+        output_s3_uri=Join(
+            on="/",
+            values=[
+                "s3:/",
+                default_bucket,
+                base_job_prefix,
+                ExecutionVariables.PIPELINE_EXECUTION_ID,
+                "dataqualitycheckstep",
+            ],
+        ),
+    )
+
+    step_baseline = QualityCheckStep(
+        name="DataQualityBaselineJob",
+        skip_check=True,
+        register_new_baseline=True,
+        quality_check_config=data_quality_check_config,
+        check_job_config=check_job_config,
+        model_package_group_name=model_package_group_name,
         cache_config=cache_config,
     )
-
+    
     # Define the XGBoost training report rules
     # see: https://docs.aws.amazon.com/sagemaker/latest/dg/debugger-training-xgboost-report.html
     rules = [Rule.sagemaker(rule_configs.create_xgboost_report())]
@@ -328,8 +319,29 @@ def get_pipeline(
                 ]
             ),
             content_type="application/json",
-        )
+        ),
+        model_data_statistics=MetricsSource(
+            s3_uri=step_baseline.properties.CalculatedBaselineStatistics,
+            content_type="application/json",
+        ),
+        model_data_constraints=MetricsSource(
+            s3_uri=step_baseline.properties.CalculatedBaselineConstraints,
+            content_type="application/json",
+        ),
     )
+    
+    drift_check_baselines = DriftCheckBaselines(
+        model_data_statistics=MetricsSource(
+            s3_uri=step_baseline.properties.BaselineUsedForDriftCheckStatistics,
+            content_type="application/json",
+        ),
+        model_data_constraints=MetricsSource(
+            s3_uri=step_baseline.properties.BaselineUsedForDriftCheckConstraints,
+            content_type="application/json",
+        ),
+    )
+    
+
     step_register = RegisterModel(
         name="RegisterModel",
         estimator=xgb_train,
@@ -341,6 +353,7 @@ def get_pipeline(
         model_package_group_name=model_package_group_name,
         approval_status=model_approval_status,
         model_metrics=model_metrics,
+        drift_check_baselines=drift_check_baselines,
     )
 
     # condition step for evaluating model quality and branching execution

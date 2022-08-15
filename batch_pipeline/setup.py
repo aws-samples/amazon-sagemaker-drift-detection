@@ -6,9 +6,9 @@ with open("README.md") as fp:
 
 
 setuptools.setup(
-    name="amazon_sagemaker_drift_detection_deployment_pipeline",
+    name="amazon_sagemaker_drift_detection_batch_pipeline",
     version="0.0.1",
-    description="Amazon SageMaker Drift Detection Deployment pipeline",
+    description="Amazon SageMaker Drift Detection Batch pipeline",
     long_description=long_description,
     long_description_content_type="text/markdown",
     author="amazon",
@@ -17,10 +17,11 @@ setuptools.setup(
     install_requires=[
         "boto3==1.20.19",
         "aws-cdk.core==1.116.0",
+        "aws-cdk.aws-cloudwatch==1.116.0",
+        "aws-cdk.aws-events==1.116.0",
         "aws-cdk.aws-iam==1.116.0",
         "aws-cdk.aws-sagemaker==1.116.0",
-        "aws-cdk.aws-applicationautoscaling==1.116.0",
-        "aws-cdk.aws-cloudwatch==1.116.0",
+        "sagemaker==2.70.0",
     ],
     python_requires=">=3.8",
     classifiers=[

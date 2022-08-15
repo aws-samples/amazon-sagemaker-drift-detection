@@ -1,6 +1,7 @@
 name: Publish Template to S3
 
 on:
+  workflow_dispatch:
   push:
     branches: [ main ]
   pull_request:
