@@ -1,10 +1,10 @@
-import boto3
 import glob
 import json
 import logging
 import os
 import zipfile
 
+import boto3
 
 # Get environment variables
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -68,7 +68,7 @@ def zip_filter(filename: str) -> bool:
 
 
 def make_zipfile(source_dir: str) -> str:
-    """Makes a zip file for the sourc directory
+    """Makes a zip file for the source directory
 
     Args:
         source_dir (str): The source directory to zip
@@ -120,14 +120,14 @@ def strip_s3_region(template_name):
     # Backup the original template before creating a new version
     template_backup = template_name + ".bak"
     os.rename(template_name, template_backup)
-    with open(template_backup, "rt") as fin:
-        with open(template_name, "wt") as fout:
-            for line in fin:
+    with open(template_backup, "rt") as f_in:
+        with open(template_name, "wt") as f_out:
+            for line in f_in:
                 # read replace the s3 region file
                 new_line = line.replace(
                     "s3.${AWS::Region}.${AWS::URLSuffix}", "s3.${AWS::URLSuffix}"
                 )
-                fout.write(new_line)
+                f_out.write(new_line)
 
 
 if __name__ == "__main__":

@@ -1,19 +1,18 @@
-from aws_cdk import (
-    core,
-    aws_sagemaker as sagemaker,
-    aws_applicationautoscaling as applicationautoscaling,
-    aws_cloudwatch as cloudwatch,
-)
-
 import logging
+
+import aws_cdk as cdk
+from aws_cdk import aws_applicationautoscaling as applicationautoscaling
+from aws_cdk import aws_cloudwatch as cloudwatch
+from aws_cdk import aws_sagemaker as sagemaker
+from constructs import Construct
 
 logger = logging.getLogger(__name__)
 
 
-class SageMakerStack(core.Stack):
+class SageMakerStack(cdk.Stack):
     def __init__(
         self,
-        scope: core.Construct,
+        scope: Construct,
         construct_id: str,
         sagemaker_execution_role: str,
         deployment_config: object,
@@ -229,7 +228,7 @@ class SageMakerStack(core.Stack):
             "us-west-1": "890145073186",
             "us-west-2": "159807026194",
         }
-        mapping = core.CfnMapping(self, "ModelAnalyzerMap")
+        mapping = cdk.CfnMapping(self, "ModelAnalyzerMap")
         container = "sagemaker-model-monitor-analyzer:latest"
         for region in region_to_account:
             mapping.set_value(

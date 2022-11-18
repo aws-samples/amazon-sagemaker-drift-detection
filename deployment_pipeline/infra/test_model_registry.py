@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
-from botocore.stub import Stubber
+
 import pytest
+from botocore.stub import Stubber
 
 from infra.model_registry import ModelRegistry
 

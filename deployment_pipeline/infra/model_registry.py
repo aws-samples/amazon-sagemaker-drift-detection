@@ -33,7 +33,7 @@ class ModelRegistry:
                 ModelPackageGroupDescription=description,
             )
             model_package_group_arn = response["ModelPackageGroupArn"]
-            # Add tags seperately
+            # Add tags separately
             self.sm_client.add_tags(
                 ResourceArn=model_package_group_arn,
                 Tags=[
@@ -84,7 +84,7 @@ class ModelRegistry:
                 "SortBy": "CreationTime",
                 "MaxResults": max_results,
             }
-            # Add optional creationg time after
+            # Add optional creation time after
             if creation_time_after is not None:
                 args = {**args, "CreationTimeAfter": creation_time_after}
             response = self.sm_client.list_model_packages(**args)
@@ -182,7 +182,7 @@ class ModelRegistry:
     def select_versioned_packages(
         self, model_packages: list, model_package_versions: list
     ):
-        """Filters the model packages based on a list of model package verisons.
+        """Filters the model packages based on a list of model package versions.
 
         Args:
             model_packages: The list of packages.
@@ -201,7 +201,7 @@ class ModelRegistry:
         return filtered_packages
 
     def get_pipeline_execution_arn(self, model_package_arn: str):
-        """Geturns the execution arn for the latest approved model package
+        """Get the execution arn for the latest approved model package
 
         Args:
             model_package_arn: The arn of the model package

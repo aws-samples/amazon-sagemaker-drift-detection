@@ -1,9 +1,10 @@
+import json
+import logging
+import os
+
 import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError
-import json
-import os
-import logging
 
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 

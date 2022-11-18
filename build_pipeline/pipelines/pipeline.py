@@ -13,51 +13,36 @@ import os
 import boto3
 import sagemaker
 import sagemaker.session
-
-from sagemaker.estimator import Estimator
 from sagemaker.debugger import Rule, rule_configs
+from sagemaker.drift_check_baselines import DriftCheckBaselines
+from sagemaker.estimator import Estimator
 from sagemaker.inputs import TrainingInput
+from sagemaker.model_metrics import MetricsSource, ModelMetrics
 from sagemaker.model_monitor.dataset_format import DatasetFormat
-from sagemaker.model_metrics import (
-    MetricsSource,
-    ModelMetrics,
-)
 from sagemaker.processing import (
     ProcessingInput,
     ProcessingOutput,
     Processor,
     ScriptProcessor,
 )
-from sagemaker.sklearn.processing import SKLearnProcessor
 from sagemaker.s3 import S3Uploader
+from sagemaker.sklearn.processing import SKLearnProcessor
+from sagemaker.utils import name_from_base
+from sagemaker.workflow.check_job_config import CheckJobConfig
+from sagemaker.workflow.condition_step import ConditionStep, JsonGet
 from sagemaker.workflow.conditions import ConditionLessThanOrEqualTo
-from sagemaker.workflow.condition_step import (
-    ConditionStep,
-    JsonGet,
-)
-from sagemaker.workflow.parameters import (
-    ParameterInteger,
-    ParameterString,
-)
+from sagemaker.workflow.execution_variables import ExecutionVariables
+from sagemaker.workflow.functions import Join
+from sagemaker.workflow.parameters import ParameterInteger, ParameterString
 from sagemaker.workflow.pipeline import Pipeline
 from sagemaker.workflow.properties import PropertyFile
-from sagemaker.workflow.steps import (
-    ProcessingStep,
-    TrainingStep,
-    CacheConfig,
-)
 from sagemaker.workflow.quality_check_step import (
     DataQualityCheckConfig,
     ModelQualityCheckConfig,
     QualityCheckStep,
 )
-from sagemaker.drift_check_baselines import DriftCheckBaselines
-from sagemaker.workflow.check_job_config import CheckJobConfig
 from sagemaker.workflow.step_collections import RegisterModel
-from sagemaker.workflow.functions import Join
-from sagemaker.workflow.execution_variables import ExecutionVariables
-from sagemaker.utils import name_from_base
-
+from sagemaker.workflow.steps import CacheConfig, ProcessingStep, TrainingStep
 
 BASE_DIR = os.path.dirname(os.path.realpath(__file__))
 
@@ -181,7 +166,7 @@ def get_pipeline(
         code=os.path.join(BASE_DIR, "preprocess.py"),
         cache_config=cache_config,
     )
-    
+
     check_job_config = CheckJobConfig(
         role=role,
         instance_count=1,
@@ -190,7 +175,9 @@ def get_pipeline(
     )
 
     data_quality_check_config = DataQualityCheckConfig(
-        baseline_dataset=step_process.properties.ProcessingOutputConfig.Outputs["baseline"].S3Output.S3Uri,
+        baseline_dataset=step_process.properties.ProcessingOutputConfig.Outputs[
+            "baseline"
+        ].S3Output.S3Uri,
         dataset_format=DatasetFormat.csv(),
         output_s3_uri=Join(
             on="/",
@@ -213,7 +200,7 @@ def get_pipeline(
         model_package_group_name=model_package_group_name,
         cache_config=cache_config,
     )
-    
+
     # Define the XGBoost training report rules
     # see: https://docs.aws.amazon.com/sagemaker/latest/dg/debugger-training-xgboost-report.html
     rules = [Rule.sagemaker(rule_configs.create_xgboost_report())]
@@ -329,7 +316,7 @@ def get_pipeline(
             content_type="application/json",
         ),
     )
-    
+
     drift_check_baselines = DriftCheckBaselines(
         model_data_statistics=MetricsSource(
             s3_uri=step_baseline.properties.BaselineUsedForDriftCheckStatistics,
@@ -340,7 +327,6 @@ def get_pipeline(
             content_type="application/json",
         ),
     )
-    
 
     step_register = RegisterModel(
         name="RegisterModel",
