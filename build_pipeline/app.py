@@ -49,25 +49,6 @@ def main(
         # Name of the S3 bucket for file assets
         file_assets_bucket_name=artifact_bucket,
         bucket_prefix="build-pipeline-cdk-assets/",
-        # Name of the ECR repository for Docker image assets
-        # image_assets_repository_name="cdk-${Qualifier}-container-assets-${AWS::AccountId}-${AWS::Region}",
-        # ARN of the role assumed by the CLI and Pipeline to deploy here
-        deploy_role_arn="arn:aws:iam::570358149193:role/service-role/AmazonSageMakerServiceCatalogProductsCodePipelineRole",
-        deploy_role_external_id="",
-        # ARN of the role used for file asset publishing (assumed from the deploy role)
-        file_asset_publishing_role_arn="arn:aws:iam::570358149193:role/service-role/AmazonSageMakerServiceCatalogProductsCodeBuildRole",
-        file_asset_publishing_external_id="",
-        # ARN of the role used for Docker asset publishing (assumed from the deploy role)
-        image_asset_publishing_role_arn="arn:aws:iam::570358149193:role/service-role/AmazonSageMakerServiceCatalogProductsCodeBuildRole",
-        image_asset_publishing_external_id="",
-        # ARN of the role passed to CloudFormation to execute the deployments
-        cloud_formation_execution_role="arn:aws:iam::570358149193:role/service-role/AmazonSageMakerServiceCatalogProductsCloudformationRole",
-        # ARN of the role used to look up context information in an environment
-        lookup_role_arn="arn:aws:iam::570358149193:role/service-role/AmazonSageMakerServiceCatalogProductsCodeBuildRole",
-        lookup_role_external_id="",
-        # Name of the SSM parameter which describes the bootstrap stack version number
-        # bootstrap_stack_version_ssm_parameter="/cdk-bootstrap/${Qualifier}/version",
-        # Add a rule to every template which verifies the required bootstrap stack version
         generate_bootstrap_version_rule=False,
     )
 

@@ -8,7 +8,6 @@ from aws_cdk import aws_lambda as lambda_
 from aws_cdk import aws_s3 as s3
 from aws_cdk import aws_s3_deployment as s3d
 from aws_cdk import aws_servicecatalog as servicecatalog
-from aws_cdk import aws_ssm as ssm
 from constructs import Construct
 
 from infra.pipeline_product_stack import BatchPipelineStack, DeployPipelineStack
