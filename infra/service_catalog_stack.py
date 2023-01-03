@@ -62,13 +62,20 @@ class ServiceCatalogStack(cdk.Stack):
             min_length=1,
         )
 
-        seed_bucket = s3.Bucket(
-            self,
-            "SeedBucket",
-            bucket_name="sagemaker-drift-detection-template-seed",
-            removal_policy=cdk.RemovalPolicy.DESTROY,
-            auto_delete_objects=True,
-        )
+        if seed_bucket_name := self.node.try_get_context("SeedBucketName"):
+            seed_bucket = s3.Bucket(
+                self,
+                "SeedBucket",
+                bucket_name=seed_bucket_name,
+            )
+        else:
+            seed_bucket = s3.Bucket(
+                self,
+                "SeedBucket",
+                bucket_name=f"sagemaker-drift-detection-template-seed-{self.account}",
+                removal_policy=cdk.RemovalPolicy.DESTROY,
+                auto_delete_objects=True,
+            )
 
         path_list = ["build_pipeline", "batch_pipeline", "deployment_pipeline"]
 
@@ -85,14 +92,15 @@ class ServiceCatalogStack(cdk.Stack):
             sources=[s3d.Source.asset(temp_path.as_posix())],
         )
 
-        # Lambda powering the custom resource to convert names to lower case at deploy time
+        # Lambda powering the custom resource to convert names to lower case at
+        # deploy time
         with open("lambda/lowercase_name.py", encoding="utf8") as fp:
             lambda_start_pipeline_code = fp.read()
 
         lowercase_lambda = lambda_.Function(
             self,
             "LowerCaseLambda",
-            function_name=f"sagemaker-lowercase-names",
+            function_name="sagemaker-lowercase-names",
             description="Returns the lowercase version of a string",
             code=lambda_.Code.from_inline(lambda_start_pipeline_code),
             handler="index.lambda_handler",
@@ -101,7 +109,8 @@ class ServiceCatalogStack(cdk.Stack):
             memory_size=128,
         )
 
-        # Check for custom launch roles, otherwise fall back to default role created with SageMaker Studio
+        # Check for custom launch roles, otherwise fall back to default
+        # role created with SageMaker Studio
         if (
             products_launch_role_name := self.node.try_get_context(
                 "drift:ProductsLaunchRoleName"
@@ -266,7 +275,14 @@ class ServiceCatalogStack(cdk.Stack):
                     product_version_name=product_version.value_as_string,
                 )
             ],
-            description="This template includes a model building pipeline that includes a workflow to pre-process, train, evaluate and register a model as well as create a baseline for model monitoring.   The batch pipeline creates a staging and production workflow to perform scoring, and model monitor to output metrics to automate re-training on drift detection.",
+            description=(
+                "This template includes a model building pipeline "
+                "that includes a workflow to pre-process, train, evaluate and register"
+                " a model as well as create a baseline for model monitoring. "
+                "The batch pipeline creates a staging and production workflow to"
+                " perform scoring, and model monitor to output metrics "
+                "to automate re-training on drift detection.",
+            ),
         )
         portfolio.add_product(batch_product)
 
@@ -280,7 +296,9 @@ class ServiceCatalogStack(cdk.Stack):
             self,
             "DeployProduct",
             owner=portfolio_owner.value_as_string,
-            product_name="Amazon SageMaker drift detection template for real-time deployment",
+            product_name=(
+                "Amazon SageMaker drift detection template for real-time deployment"
+            ),
             product_versions=[
                 servicecatalog.CloudFormationProductVersion(
                     cloud_formation_template=servicecatalog.CloudFormationTemplate.from_product_stack(
@@ -295,7 +313,14 @@ class ServiceCatalogStack(cdk.Stack):
                     product_version_name=product_version.value_as_string,
                 )
             ],
-            description="This template includes a model building pipeline that includes a workflow to pre-process, train, evaluate and register a model as well as create a baseline for model monitoring.   The deploy pipeline creates a staging and production endpoint, and schedules model monitor to output metrics to automate re-training on drift detection.",
+            description=(
+                "This template includes a model building pipeline that includes "
+                "a workflow to pre-process, train, evaluate and register a model as "
+                "well as create a baseline for model monitoring. "
+                "The deploy pipeline creates a staging and production endpoint, "
+                "and schedules model monitor to output metrics "
+                "to automate re-training on drift detection.",
+            ),
         )
         cdk.Tags.of(deploy_product).add(key="sagemaker:studio-visibility", value="true")
         portfolio.add_product(deploy_product)
@@ -316,7 +341,7 @@ def create_zip(zipfile_name: str, local_path: Path):
             archive.write(k, arcname=f"{k.relative_to(local_path)}")
             for k in local_path.glob("**/*.*")
             if not f"{k.relative_to(local_path)}".startswith(("cdk.out", "."))
-            if not "__pycache__" in f"{k.relative_to(local_path)}"
+            if "__pycache__" not in f"{k.relative_to(local_path)}"
             if not f"{k.relative_to(local_path)}".endswith(".zip")
         ]
         if (gitignore_path := local_path / ".gitignore").exists():
