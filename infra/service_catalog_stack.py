@@ -275,14 +275,12 @@ class ServiceCatalogStack(cdk.Stack):
                     product_version_name=product_version.value_as_string,
                 )
             ],
-            description=(
-                "This template includes a model building pipeline "
-                "that includes a workflow to pre-process, train, evaluate and register"
-                " a model as well as create a baseline for model monitoring. "
-                "The batch pipeline creates a staging and production workflow to"
-                " perform scoring, and model monitor to output metrics "
-                "to automate re-training on drift detection.",
-            ),
+            description="This template includes a model building pipeline "
+            "that includes a workflow to pre-process, train, evaluate and register"
+            " a model as well as create a baseline for model monitoring. "
+            "The batch pipeline creates a staging and production workflow to"
+            " perform scoring, and model monitor to output metrics "
+            "to automate re-training on drift detection.",
         )
         portfolio.add_product(batch_product)
 
@@ -313,14 +311,12 @@ class ServiceCatalogStack(cdk.Stack):
                     product_version_name=product_version.value_as_string,
                 )
             ],
-            description=(
-                "This template includes a model building pipeline that includes "
-                "a workflow to pre-process, train, evaluate and register a model as "
-                "well as create a baseline for model monitoring. "
-                "The deploy pipeline creates a staging and production endpoint, "
-                "and schedules model monitor to output metrics "
-                "to automate re-training on drift detection.",
-            ),
+            description="This template includes a model building pipeline that "
+            "includes a workflow to pre-process, train, evaluate and register a "
+            "model as well as create a baseline for model monitoring. "
+            "The deploy pipeline creates a staging and production endpoint, "
+            "and schedules model monitor to output metrics "
+            "to automate re-training on drift detection.",
         )
         cdk.Tags.of(deploy_product).add(key="sagemaker:studio-visibility", value="true")
         portfolio.add_product(deploy_product)

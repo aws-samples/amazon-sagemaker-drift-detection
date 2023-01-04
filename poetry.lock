@@ -21,14 +21,14 @@ tests-no-zope = ["cloudpickle", "cloudpickle", "hypothesis", "hypothesis", "mypy
 
 [[package]]
 name = "aws-cdk-asset-awscli-v1"
-version = "2.2.48"
+version = "2.2.49"
 description = "A library that contains the AWS CLI for use in Lambda Layers"
 category = "main"
 optional = false
 python-versions = "~=3.7"
 files = [
-    {file = "aws-cdk.asset-awscli-v1-2.2.48.tar.gz", hash = "sha256:94272cf3ef29a4bc760181ea8cef911f9eb5af2e1311350216ad7b828915c3c6"},
-    {file = "aws_cdk.asset_awscli_v1-2.2.48-py3-none-any.whl", hash = "sha256:b2e5176f93a361df5fd90da22088b7a5701ebd7f9b04084b4d4109d11b1aa694"},
+    {file = "aws-cdk.asset-awscli-v1-2.2.49.tar.gz", hash = "sha256:d367da8bdc83357792b1ef16b6166d400ef15f2389cf0032b607b6327768a41a"},
+    {file = "aws_cdk.asset_awscli_v1-2.2.49-py3-none-any.whl", hash = "sha256:28df4487e2fa5314d5c39c114e12d366714a1fab2de3269d55c4e544876cae44"},
 ]
 
 [package.dependencies]
@@ -72,14 +72,14 @@ typeguard = ">=2.13.3,<2.14.0"
 
 [[package]]
 name = "aws-cdk-lib"
-version = "2.58.1"
+version = "2.59.0"
 description = "Version 2 of the AWS Cloud Development Kit library"
 category = "main"
 optional = false
 python-versions = "~=3.7"
 files = [
-    {file = "aws-cdk-lib-2.58.1.tar.gz", hash = "sha256:457e366a7d34bb391be19f2b51ee2cc1b16fd6f0cd5fa23aa0fbbd2c80a70eca"},
-    {file = "aws_cdk_lib-2.58.1-py3-none-any.whl", hash = "sha256:e53ae6590ca1f36f16780021ef260345a6e251b4195b0389d9d5f693b2fa187a"},
+    {file = "aws-cdk-lib-2.59.0.tar.gz", hash = "sha256:1faeced63e37a4caa58472ba368664e3aea935b3193ccbc3f4f55a81d93b59d1"},
+    {file = "aws_cdk_lib-2.59.0-py3-none-any.whl", hash = "sha256:0f8718be6951facac8044c286e49c6459a00a833d9d8c56274f27af41ed194c6"},
 ]
 
 [package.dependencies]
@@ -129,18 +129,18 @@ uvloop = ["uvloop (>=0.15.2)"]
 
 [[package]]
 name = "boto3"
-version = "1.26.41"
+version = "1.26.42"
 description = "The AWS SDK for Python"
 category = "main"
 optional = false
 python-versions = ">= 3.7"
 files = [
-    {file = "boto3-1.26.41-py3-none-any.whl", hash = "sha256:05a5ce3af2d7419e39d93498c7f56fd5c2cc17870c92c4abc75659553b0b16de"},
-    {file = "boto3-1.26.41.tar.gz", hash = "sha256:8cbea352f28ec6b241f348356bcb8f331fc433bec3ad76ebf6194227f1a7f613"},
+    {file = "boto3-1.26.42-py3-none-any.whl", hash = "sha256:75c995a04723f23e35e16ea491ed91a1345e2fa6492678a216488512308dada1"},
+    {file = "boto3-1.26.42.tar.gz", hash = "sha256:4cfd7e05e4033dbca2cc59bcfdafbdaef9d83dc3c0448917569b301d85766d9d"},
 ]
 
 [package.dependencies]
-botocore = ">=1.29.41,<1.30.0"
+botocore = ">=1.29.42,<1.30.0"
 jmespath = ">=0.7.1,<2.0.0"
 s3transfer = ">=0.6.0,<0.7.0"
 
@@ -149,14 +149,14 @@ crt = ["botocore[crt] (>=1.21.0,<2.0a0)"]
 
 [[package]]
 name = "botocore"
-version = "1.29.41"
+version = "1.29.42"
 description = "Low-level, data-driven core of boto 3."
 category = "main"
 optional = false
 python-versions = ">= 3.7"
 files = [
-    {file = "botocore-1.29.41-py3-none-any.whl", hash = "sha256:b670b7f8958a2908167081efb6ea39794bf61d618be729984629a63d85cf8bfe"},
-    {file = "botocore-1.29.41.tar.gz", hash = "sha256:78761227d986d393956b6d08fdadcfe142748828e0e9db33f2f4c42a482dcd35"},
+    {file = "botocore-1.29.42-py3-none-any.whl", hash = "sha256:f52f9dbd7ad42b3528c1052086c1a7b6122a018f919afdb604f2889caefe8092"},
+    {file = "botocore-1.29.42.tar.gz", hash = "sha256:d05c62f64e76194c40f598f5f7c804ec50d9820e9f03f6e0198558e4ace167c4"},
 ]
 
 [package.dependencies]
@@ -212,14 +212,14 @@ files = [
 
 [[package]]
 name = "constructs"
-version = "10.1.208"
+version = "10.1.209"
 description = "A programming model for software-defined state"
 category = "main"
 optional = false
 python-versions = "~=3.7"
 files = [
-    {file = "constructs-10.1.208-py3-none-any.whl", hash = "sha256:06b487df5c6360488c64dbcc63ca2c3f6b8dfded4b324d818fb025c07ad3ee95"},
-    {file = "constructs-10.1.208.tar.gz", hash = "sha256:c2ef91530c2fc751c9e5c29c7abb71e621acb283fa802d4151a6c044e0c665df"},
+    {file = "constructs-10.1.209-py3-none-any.whl", hash = "sha256:fb61b038e12f4f99550dd7537ba1f2a324e59242d0719ec5ef371b66492c7642"},
+    {file = "constructs-10.1.209.tar.gz", hash = "sha256:679235f1d331f75fa170af8f6e7ed088bcd5114f91d48c6a971e266447491a6b"},
 ]
 
 [package.dependencies]
@@ -666,13 +666,13 @@ crt = ["botocore[crt] (>=1.20.29,<2.0a.0)"]
 
 [[package]]
 name = "sagemaker"
-version = "2.126.0"
+version = "2.127.0"
 description = "Open source library for training and deploying models on Amazon SageMaker."
 category = "dev"
 optional = false
 python-versions = ">= 3.6"
 files = [
-    {file = "sagemaker-2.126.0.tar.gz", hash = "sha256:c2e539dc59abb4063c134f10f96e0e841a0143c924b372e326247b93195b7c08"},
+    {file = "sagemaker-2.127.0.tar.gz", hash = "sha256:417d229513be4dafc5dc3375f94c9bf0fa4e28f03c84780ea4afcb8861b5c08d"},
 ]
 
 [package.dependencies]
