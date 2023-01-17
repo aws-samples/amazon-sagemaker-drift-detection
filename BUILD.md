@@ -173,7 +173,7 @@ Run the following command to deploy the MLOps project template, passing the requ
 ```
 export EXECUTION_ROLE_ARN=<<sagemaker-studio-execution-role>>
 cdk deploy drift-service-catalog \
-    --parameters ExecutionRoleArn=$EXECUTION_ROLE_ARN \
+    --parameters SageMakerUserExecutionRoleArn=$EXECUTION_ROLE_ARN \
     --parameters PortfolioName="SageMaker Organization Templates" \
     --parameters PortfolioOwner="administrator" \
     --parameters ProductVersion=1.0
