@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "build-pipeline"
+version = "0.1.0"
+description = ""
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+packages = [{include = "build_pipeline"}]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+aws-cdk-lib = "^2.47.0"
+constructs = "^10.1.137"
+sagemaker = "^2.113.0"
+
+
+[tool.poetry.group.dev.dependencies]
+black = {version = "^22.10.0", allow-prereleases = true}
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

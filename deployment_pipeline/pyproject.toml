@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "sagemaker-demotest-deploy"
+version = "0.1.0"
+description = ""
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+packages = [{include = "sagemaker_demotest_deploy"}]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+aws-cdk-lib = "^2.50.0"
+constructs = "^10.1.153"
+boto3 = "^1.26.4"
+
+
+[tool.poetry.group.dev.dependencies]
+black = {version = "^22.10.0", allow-prereleases = true}
+pytest = "^7.2.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

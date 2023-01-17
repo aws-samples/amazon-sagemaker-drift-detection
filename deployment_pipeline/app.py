@@ -4,11 +4,11 @@ import json
 import logging
 import os
 
-from aws_cdk import core
-from infra.deployment_config import DeploymentConfig, VariantConfig
-from infra.sagemaker_stack import SageMakerStack
-from infra.model_registry import ModelRegistry
+import aws_cdk as cdk
 
+from infra.deployment_config import DeploymentConfig, VariantConfig
+from infra.model_registry import ModelRegistry
+from infra.sagemaker_stack import SageMakerStack
 
 # Configure the logger
 logger = logging.getLogger(__name__)
@@ -18,7 +18,7 @@ registry = ModelRegistry()
 
 
 def create_endpoint(
-    app: core.App,
+    app: cdk.App,
     project_name: str,
     project_id: str,
     sagemaker_execution_role: str,
@@ -36,9 +36,9 @@ def create_endpoint(
 
     # Define the deployment tags
     tags = [
-        core.CfnTag(key="sagemaker:deployment-stage", value=stage_name),
-        core.CfnTag(key="sagemaker:project-id", value=project_id),
-        core.CfnTag(key="sagemaker:project-name", value=project_name),
+        cdk.CfnTag(key="sagemaker:deployment-stage", value=stage_name),
+        cdk.CfnTag(key="sagemaker:project-id", value=project_id),
+        cdk.CfnTag(key="sagemaker:project-name", value=project_name),
     ]
 
     # Get the stage specific deployment config for sagemaker
@@ -70,11 +70,6 @@ def create_endpoint(
         )[0]
         deployment_config.variant_config.model_package_arn = p["ModelPackageArn"]
 
-    # Get the pipeline execution to get the baseline uri, for passing into
-    pipeline_execution_arn = registry.get_pipeline_execution_arn(
-        deployment_config.variant_config.model_package_arn
-    )
-
     baseline_uri = registry.get_data_check_baseline_uri(p["ModelPackageArn"])
     logger.info(f"Got baseline uri: {baseline_uri}")
 
@@ -83,6 +78,12 @@ def create_endpoint(
 
     reporting_uri = f"s3://{artifact_bucket}/{project_id}/monitoring"
     logger.info(f"Got reporting uri: {reporting_uri}")
+
+    stack_synthesizer = cdk.DefaultStackSynthesizer(
+        file_assets_bucket_name=artifact_bucket,
+        bucket_prefix="deploy-pipeline-cdk-assets/",
+        generate_bootstrap_version_rule=False,
+    )
 
     return SageMakerStack(
         app,
@@ -94,6 +95,7 @@ def create_endpoint(
         data_capture_uri=data_capture_uri,
         reporting_uri=reporting_uri,
         tags=tags,
+        synthesizer=stack_synthesizer,
     )
 
 
@@ -105,7 +107,7 @@ def main(
 ):
 
     # Create App and stacks
-    app = core.App()
+    app = cdk.App()
 
     # Create two different stages for staging and prod
     create_endpoint(

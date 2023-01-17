@@ -49,7 +49,7 @@ def load_data(file_list: list):
     # Concat input files with select columns
     dfs = []
     for file in file_list:
-        dfs.append(pd.read_csv(file, usecols=use_cols))
+        dfs.append(pd.read_parquet(file, columns=use_cols))
     return pd.concat(dfs, ignore_index=True)
 
 
@@ -136,7 +136,7 @@ def save_files(base_dir: str, data_df: pd.DataFrame, val_size=0.2, test_size=0.0
 def main(base_dir):
     # Input data files
     input_dir = os.path.join(base_dir, "input/data")
-    input_file_list = glob.glob(f"{input_dir}/*.csv")
+    input_file_list = glob.glob(f"{input_dir}/*.parquet")
     logger.info(f"Input file list: {input_file_list}")
     if len(input_file_list) == 0:
         raise Exception(f"No input files found in {input_dir}")

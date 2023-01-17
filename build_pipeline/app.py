@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 import argparse
-import json
 import logging
 import os
 
-# Import the pipeline
-from pipelines.pipeline import get_pipeline, upload_pipeline
+import aws_cdk as cdk
 
-from aws_cdk import core
 from infra.sagemaker_pipeline_stack import SageMakerPipelineStack
+from pipelines.pipeline import get_pipeline
 
 # Configure the logger
 logger = logging.getLogger(__name__)
@@ -23,7 +21,6 @@ def main(
     sagemaker_pipeline_description,
     sagemaker_pipeline_role,
     artifact_bucket,
-    output_dir,
 ):
     # Use project_name for pipeline and model package group name
     model_package_group_name = project_name
@@ -36,36 +33,24 @@ def main(
         base_job_prefix=project_id,
     )
 
-    # Create output directory
-    if not os.path.exists(output_dir):
-        os.mkdir(output_dir)
-
     # Create the pipeline definition
     logger.info("Creating/updating a SageMaker Pipeline")
     pipeline_definition_body = pipeline.definition()
-    parsed = json.loads(pipeline_definition_body)
-    logger.debug(json.dumps(parsed, indent=2, sort_keys=True))
-
-    # Upload the pipeline to S3 bucket/key and return JSON with key/value for for Cfn Stack parameters.
-    # see: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-sagemaker-pipeline.html
-    pipeline_location = upload_pipeline(
-        pipeline,
-        default_bucket=artifact_bucket,
-        base_job_prefix=f"{project_id}/build",
-    )
-
-    # Store parameters as template-config.json used in the next CodePipeline step to create the SageMakerPipelineStack.
-    with open(os.path.join(output_dir, "template-config.json"), "w") as f:
-        template_configuration = {"Parameters": pipeline_location}
-        json.dump(template_configuration, f)
 
     # Create App and stacks
-    app = core.App()
+    app = cdk.App()
 
     tags = [
-        core.CfnTag(key="sagemaker:project-id", value=project_id),
-        core.CfnTag(key="sagemaker:project-name", value=project_name),
+        cdk.CfnTag(key="sagemaker:project-id", value=project_id),
+        cdk.CfnTag(key="sagemaker:project-name", value=project_name),
     ]
+
+    stack_synthesizer = cdk.DefaultStackSynthesizer(
+        # Name of the S3 bucket for file assets
+        file_assets_bucket_name=artifact_bucket,
+        bucket_prefix="build-pipeline-cdk-assets/",
+        generate_bootstrap_version_rule=False,
+    )
 
     SageMakerPipelineStack(
         app,
@@ -73,9 +58,10 @@ def main(
         model_package_group_name=model_package_group_name,
         pipeline_name=sagemaker_pipeline_name,
         pipeline_description=sagemaker_pipeline_description,
-        # pipeline_definition_body=pipeline_definition_body,
+        pipeline_definition=pipeline_definition_body,
         role_arn=sagemaker_pipeline_role,
         tags=tags,
+        synthesizer=stack_synthesizer,
     )
 
     app.synth()
@@ -105,7 +91,6 @@ if __name__ == "__main__":
         "--artifact-bucket",
         default=os.environ.get("ARTIFACT_BUCKET"),
     )
-    parser.add_argument("--output-dir", default="dist")
     args = vars(parser.parse_args())
-    print("args: {}".format(args))
+    logger.info("args: {}".format(args))
     main(**args)

@@ -1,24 +1,23 @@
-from aws_cdk import (
-    core,
-    aws_codebuild as codebuild,
-    aws_codecommit as codecommit,
-    aws_codepipeline as codepipeline,
-    aws_codepipeline_actions as codepipeline_actions,
-    aws_events as events,
-    aws_events_targets as targets,
-    aws_iam as iam,
-    aws_s3 as s3,
-)
+import aws_cdk as cdk
+from aws_cdk import aws_codebuild as codebuild
+from aws_cdk import aws_codecommit as codecommit
+from aws_cdk import aws_codepipeline as codepipeline
+from aws_cdk import aws_codepipeline_actions as codepipeline_actions
+from aws_cdk import aws_events as events
+from aws_cdk import aws_events_targets as targets
+from aws_cdk import aws_iam as iam
+from aws_cdk import aws_s3 as s3
+from constructs import Construct
 
 
-class DeployPipelineConstruct(core.Construct):
+class DeployPipelineConstruct(Construct):
     """
     Deploy pipeline construct
     """
 
     def __init__(
         self,
-        scope: core.Construct,
+        scope: Construct,
         construct_id: str,
         sagemaker_execution_role: iam.Role,
         code_pipeline_role: iam.Role,
@@ -35,24 +34,11 @@ class DeployPipelineConstruct(core.Construct):
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        # Add permissions to allow adding auto scaling for production deployment
-        cloudformation_role.add_to_principal_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "application-autoscaling:DeregisterScalableTarget",
-                    "application-autoscaling:DeleteScalingPolicy",
-                    "application-autoscaling:DescribeScalingPolicies",
-                    "application-autoscaling:PutScalingPolicy",
-                    "application-autoscaling:DescribeScalingPolicies",
-                    "application-autoscaling:RegisterScalableTarget",
-                    "application-autoscaling:DescribeScalableTargets",
-                    "iam:CreateServiceLinkedRole",
-                    "cloudwatch:DeleteAlarms",
-                    "cloudwatch:DescribeAlarms",
-                    "cloudwatch:PutMetricAlarm",
-                ],
-                resources=["*"],
-            )
+        code_pipeline_role = iam.Role.from_role_arn(
+            self, "CodePipelineRole", code_pipeline_role.role_arn, mutable=False
+        )
+        code_build_role = iam.Role.from_role_arn(
+            self, "CodeBuildRole", code_build_role.role_arn, mutable=False
         )
 
         # Create source repo from seed bucket/key
@@ -70,8 +56,8 @@ class DeployPipelineConstruct(core.Construct):
                 branch_name=branch_name,
             ),
             tags=[
-                core.CfnTag(key="sagemaker:project-id", value=project_id),
-                core.CfnTag(key="sagemaker:project-name", value=project_name),
+                cdk.CfnTag(key="sagemaker:project-id", value=project_id),
+                cdk.CfnTag(key="sagemaker:project-name", value=project_name),
             ],
         )
 
@@ -80,42 +66,13 @@ class DeployPipelineConstruct(core.Construct):
             self, "ImportedRepo", repo.attr_name
         )
 
-        # Define AWS CodeBuild spec to run node.js and python
-        # https://docs.aws.amazon.com/codebuild/latest/userguide/available-runtimes.html
         cdk_build = codebuild.PipelineProject(
             self,
             "CdkBuild",
-            project_name="sagemaker-{}-{}".format(project_name, construct_id),
+            project_name=f"sagemaker-{project_name}-{construct_id}",
             role=code_build_role,
-            build_spec=codebuild.BuildSpec.from_object(
-                dict(
-                    version="0.2",
-                    phases=dict(
-                        install={
-                            "runtime-versions": {
-                                "nodejs": "12",
-                                "python": "3.8",
-                            },
-                            "commands": [
-                                "npm install aws-cdk",
-                                "npm update",
-                                "python -m pip install -r requirements.txt",
-                            ],
-                        },
-                        build=dict(
-                            commands=[
-                                "npx cdk synth -o dist --path-metadata false",
-                            ]
-                        ),
-                    ),
-                    artifacts={
-                        "base-directory": "dist",
-                        "files": ["*.template.json"],
-                    },
-                )
-            ),
             environment=codebuild.BuildEnvironment(
-                build_image=codebuild.LinuxBuildImage.AMAZON_LINUX_2_3,
+                build_image=codebuild.LinuxBuildImage.AMAZON_LINUX_2_4,
                 environment_variables={
                     "SAGEMAKER_PROJECT_NAME": codebuild.BuildEnvironmentVariable(
                         value=project_name
@@ -141,98 +98,84 @@ class DeployPipelineConstruct(core.Construct):
             "Pipeline",
             role=code_pipeline_role,
             artifact_bucket=s3_artifact,
-            pipeline_name="sagemaker-{}-{}".format(project_name, construct_id),
-            stages=[
-                codepipeline.StageProps(
-                    stage_name="Source",
-                    actions=[
-                        codepipeline_actions.CodeCommitSourceAction(
-                            action_name="CodeCommit_Source",
-                            repository=code,
-                            trigger=codepipeline_actions.CodeCommitTrigger.NONE,  # Created below
-                            event_role=event_role,
-                            output=source_output,
-                            branch=branch_name,
-                            role=code_pipeline_role,
-                        )
-                    ],
-                ),
-                codepipeline.StageProps(
-                    stage_name="Build",
-                    actions=[
-                        codepipeline_actions.CodeBuildAction(
-                            action_name="Build_CDK_Template",
-                            project=cdk_build,
-                            input=source_output,
-                            outputs=[
-                                cdk_build_output,
-                            ],
-                            role=code_pipeline_role,
-                        ),
-                    ],
-                ),
-                codepipeline.StageProps(
-                    stage_name="DeployStaging",
-                    actions=[
-                        codepipeline_actions.CloudFormationCreateUpdateStackAction(
-                            action_name="Deploy_CFN_Staging",
-                            run_order=1,
-                            template_path=cdk_build_output.at_path(
-                                "drift-deploy-staging.template.json"
-                            ),
-                            stack_name="sagemaker-{}-{}-staging".format(
-                                project_name, construct_id
-                            ),
-                            admin_permissions=False,
-                            deployment_role=cloudformation_role,
-                            role=code_pipeline_role,
-                            replace_on_failure=True,
-                        ),
-                        codepipeline_actions.ManualApprovalAction(
-                            action_name="Approve_Staging",
-                            run_order=2,
-                            additional_information="Approving deployment for production",
-                            role=code_pipeline_role,
-                        ),
-                    ],
-                ),
-                codepipeline.StageProps(
-                    stage_name="DeployProd",
-                    actions=[
-                        codepipeline_actions.CloudFormationCreateUpdateStackAction(
-                            action_name="Deploy_CFN_Prod",
-                            run_order=1,
-                            template_path=cdk_build_output.at_path(
-                                "drift-deploy-prod.template.json"
-                            ),
-                            stack_name="sagemaker-{}-{}-prod".format(
-                                project_name, construct_id
-                            ),
-                            admin_permissions=False,
-                            deployment_role=cloudformation_role,
-                            role=code_pipeline_role,
-                            replace_on_failure=True,
-                        ),
-                    ],
-                ),
+            pipeline_name=f"sagemaker-{project_name}-{construct_id}",
+        )
+
+        source_stage = code_pipeline.add_stage(
+            stage_name="Source",
+            actions=[
+                codepipeline_actions.CodeCommitSourceAction(
+                    action_name="CodeCommit_Source",
+                    repository=code,
+                    trigger=codepipeline_actions.CodeCommitTrigger.NONE,  # Created below
+                    event_role=event_role,
+                    output=source_output,
+                    branch=branch_name,
+                    role=code_pipeline_role,
+                )
             ],
         )
 
-        # Allow event role to start code pipeline
-        event_role.add_to_policy(
-            iam.PolicyStatement(
-                actions=["codepipeline:StartPipelineExecution"],
-                resources=[code_pipeline.pipeline_arn],
-            )
+        build_stage = code_pipeline.add_stage(
+            stage_name="Build",
+            actions=[
+                codepipeline_actions.CodeBuildAction(
+                    action_name="Build_CDK_Template",
+                    project=cdk_build,
+                    input=source_output,
+                    outputs=[
+                        cdk_build_output,
+                    ],
+                    role=code_pipeline_role,
+                ),
+            ],
+        )
+        staging_deploy_stage = code_pipeline.add_stage(
+            stage_name="DeployStaging",
+            actions=[
+                codepipeline_actions.CloudFormationCreateUpdateStackAction(
+                    action_name="Deploy_CFN_Staging",
+                    run_order=1,
+                    template_path=cdk_build_output.at_path(
+                        "drift-deploy-staging.template.json"
+                    ),
+                    stack_name=f"sagemaker-{project_name}-{construct_id}-staging",
+                    admin_permissions=False,
+                    deployment_role=cloudformation_role,
+                    role=code_pipeline_role,
+                    replace_on_failure=True,
+                ),
+                codepipeline_actions.ManualApprovalAction(
+                    action_name="Approve_Staging",
+                    run_order=2,
+                    additional_information="Approving deployment for production",
+                    role=code_pipeline_role,
+                ),
+            ],
+        )
+        production_deploy_stage = code_pipeline.add_stage(
+            stage_name="DeployProd",
+            actions=[
+                codepipeline_actions.CloudFormationCreateUpdateStackAction(
+                    action_name="Deploy_CFN_Prod",
+                    run_order=1,
+                    template_path=cdk_build_output.at_path(
+                        "drift-deploy-prod.template.json"
+                    ),
+                    stack_name=f"sagemaker-{project_name}-{construct_id}-prod",
+                    admin_permissions=False,
+                    deployment_role=cloudformation_role,
+                    role=code_pipeline_role,
+                    replace_on_failure=True,
+                ),
+            ],
         )
 
         # Add deploy role to target the code pipeline when model package is approved
         events.Rule(
             self,
             "ModelRegistryRule",
-            rule_name="sagemaker-{}-modelregistry-{}".format(
-                project_name, construct_id
-            ),
+            rule_name=f"sagemaker-{project_name}-modelregistry-{construct_id}",
             description="Rule to trigger a deployment when SageMaker Model registry is updated with a new model package.",
             event_pattern=events.EventPattern(
                 source=["aws.sagemaker"],
@@ -255,7 +198,7 @@ class DeployPipelineConstruct(core.Construct):
         events.Rule(
             self,
             "CodeCommitRule",
-            rule_name="sagemaker-{}-codecommit-{}".format(project_name, construct_id),
+            rule_name=f"sagemaker-{project_name}-codecommit-{construct_id}",
             description="Rule to trigger a deployment when configuration is updated in CodeCommit.",
             event_pattern=events.EventPattern(
                 source=["aws.codecommit"],

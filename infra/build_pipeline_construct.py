@@ -1,27 +1,28 @@
-from aws_cdk import (
-    core,
-    aws_codebuild as codebuild,
-    aws_codecommit as codecommit,
-    aws_codepipeline as codepipeline,
-    aws_codepipeline_actions as codepipeline_actions,
-    aws_events as events,
-    aws_events_targets as targets,
-    aws_iam as iam,
-    aws_lambda as lambda_,
-    aws_s3 as s3,
-)
+import aws_cdk as cdk
+from aws_cdk import aws_codebuild as codebuild
+from aws_cdk import aws_codecommit as codecommit
+from aws_cdk import aws_codepipeline as codepipeline
+from aws_cdk import aws_codepipeline_actions as codepipeline_actions
+from aws_cdk import aws_events as events
+from aws_cdk import aws_events_targets as targets
+from aws_cdk import aws_iam as iam
+from aws_cdk import aws_lambda as lambda_
+from aws_cdk import aws_s3 as s3
+from constructs import Construct
+
+from infra.sagemaker_pipelines_event_target import add_sagemaker_pipeline_target
 
 
-class BuildPipelineConstruct(core.Construct):
+class BuildPipelineConstruct(Construct):
     """
     Build pipeline construct
     """
 
     def __init__(
         self,
-        scope: core.Construct,
+        scope: Construct,
         construct_id: str,
-        env: core.Environment,
+        env: cdk.Environment,
         sagemaker_execution_role: iam.Role,
         code_pipeline_role: iam.Role,
         code_build_role: iam.Role,
@@ -35,6 +36,7 @@ class BuildPipelineConstruct(core.Construct):
         seed_bucket: str,
         seed_key: str,
         retrain_schedule: str,
+        lowercase_lambda: lambda_.Function = None,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -43,7 +45,7 @@ class BuildPipelineConstruct(core.Construct):
         repo = codecommit.CfnRepository(
             self,
             "CodeRepo",
-            repository_name="sagemaker-{}-{}".format(project_name, construct_id),
+            repository_name=f"sagemaker-{project_name}-{construct_id}",
             repository_description=f"Amazon SageMaker Drift {construct_id} pipeline",
             code=codecommit.CfnRepository.CodeProperty(
                 s3=codecommit.CfnRepository.S3Property(
@@ -54,8 +56,8 @@ class BuildPipelineConstruct(core.Construct):
                 branch_name=branch_name,
             ),
             tags=[
-                core.CfnTag(key="sagemaker:project-id", value=project_id),
-                core.CfnTag(key="sagemaker:project-name", value=project_name),
+                cdk.CfnTag(key="sagemaker:project-id", value=project_id),
+                cdk.CfnTag(key="sagemaker:project-name", value=project_name),
             ],
         )
 
@@ -66,62 +68,36 @@ class BuildPipelineConstruct(core.Construct):
 
         # Define resource names
         pipeline_name = f"{project_name}-{construct_id}"
+
+        # Use a custom resource to format the pipeline name
+        pipeline_name_lowercase = cdk.CustomResource(
+            self,
+            "CrPipelineNameLowercase",
+            service_token=lowercase_lambda.function_arn,
+            properties=dict(InputString=pipeline_name),
+        )
         pipeline_description = "SageMaker Drift Detection Model Build Pipeline"
-        sagemaker_pipeline_arn = (
-            f"arn:aws:sagemaker:{env.region}:{env.account}:pipeline/{pipeline_name}"
+        sagemaker_pipeline_arn = cdk.Fn.join(
+            delimiter="/",
+            list_of_values=[
+                f"arn:aws:sagemaker:{env.region}:{env.account}:pipeline",
+                pipeline_name_lowercase.get_att_string("OutputString"),
+            ],
         )
         code_pipeline_name = f"sagemaker-{project_name}-{construct_id}"
+        build_rule_name = f"sagemaker-{project_name}-{construct_id}-build"
         drift_rule_name = f"sagemaker-{project_name}-drift-{construct_id}"
         schedule_rule_name = f"sagemaker-{project_name}-schedule-{construct_id}"
-
-        # It seems the code build job requires  permissions to CreateBucket, despite the fact this exists
-        code_build_role.add_to_policy(
-            iam.PolicyStatement(
-                actions=["s3:CreateBucket"],
-                resources=[s3_artifact.bucket_arn],
-            )
-        )
 
         # Define AWS CodeBuild spec to run node.js and python
         # https://docs.aws.amazon.com/codebuild/latest/userguide/available-runtimes.html
         pipeline_build = codebuild.PipelineProject(
             self,
             "PipelineBuild",
-            project_name="sagemaker-{}-{}".format(project_name, construct_id),
+            project_name=f"sagemaker-{project_name}-{construct_id}",
             role=code_build_role,
-            build_spec=codebuild.BuildSpec.from_object(
-                dict(
-                    version="0.2",
-                    phases=dict(
-                        install={
-                            "runtime-versions": {
-                                "nodejs": "12",
-                                "python": "3.8",
-                            },
-                            "commands": [
-                                "npm install aws-cdk",
-                                "npm update",
-                                "python -m pip install -r requirements.txt",
-                            ],
-                        },
-                        build=dict(
-                            commands=[
-                                "npx cdk synth -o dist --path-metadata false",
-                            ]
-                        ),
-                    ),
-                    artifacts={
-                        "base-directory": "dist",
-                        "files": [
-                            "pipeline.json",
-                            "template-config.json",
-                            "*.template.json",
-                        ],
-                    },
-                )
-            ),
             environment=codebuild.BuildEnvironment(
-                build_image=codebuild.LinuxBuildImage.AMAZON_LINUX_2_3,
+                build_image=codebuild.LinuxBuildImage.AMAZON_LINUX_2_4,
                 environment_variables={
                     "SAGEMAKER_PROJECT_NAME": codebuild.BuildEnvironmentVariable(
                         value=project_name
@@ -146,35 +122,6 @@ class BuildPipelineConstruct(core.Construct):
             ),
         )
 
-        # Load the start pipeline code
-        with open("lambda/build/lambda_start_pipeline.py", encoding="utf8") as fp:
-            lambda_start_pipeline_code = fp.read()
-
-        lambda_start_pipeline = lambda_.Function(
-            self,
-            "StartPipelineFunction",
-            function_name=f"sagemaker-{project_name}-start-pipeline",
-            code=lambda_.Code.from_inline(lambda_start_pipeline_code),
-            role=lambda_role,
-            handler="index.lambda_handler",
-            runtime=lambda_.Runtime.PYTHON_3_8,
-            timeout=core.Duration.seconds(3),
-            memory_size=128,
-            environment={
-                "LOG_LEVEL": "INFO",
-            },
-        )
-
-        # Add permissions to start pipeline for lambda and event role
-        start_pipeline_policy = iam.PolicyStatement(
-            actions=[
-                "sagemaker:DescribePipelineExecution",
-                "sagemaker:StartPipelineExecution",
-            ],
-            resources=[sagemaker_pipeline_arn, f"{sagemaker_pipeline_arn}/*"],
-        )
-        lambda_start_pipeline.add_to_role_policy(start_pipeline_policy)
-
         source_output = codepipeline.Artifact()
         pipeline_build_output = codepipeline.Artifact()
 
@@ -184,86 +131,91 @@ class BuildPipelineConstruct(core.Construct):
             role=code_pipeline_role,
             artifact_bucket=s3_artifact,
             pipeline_name=code_pipeline_name,
-            stages=[
-                codepipeline.StageProps(
-                    stage_name="Source",
-                    actions=[
-                        codepipeline_actions.CodeCommitSourceAction(
-                            action_name="CodeCommit_Source",
-                            repository=code,
-                            trigger=codepipeline_actions.CodeCommitTrigger.NONE,  # Created below
-                            event_role=event_role,
-                            output=source_output,
-                            branch=branch_name,
-                            role=code_pipeline_role,
-                        )
+        )
+
+        source_stage = code_pipeline.add_stage(
+            stage_name="Source",
+            actions=[
+                codepipeline_actions.CodeCommitSourceAction(
+                    action_name="CodeCommit_Source",
+                    repository=code,
+                    trigger=codepipeline_actions.CodeCommitTrigger.NONE,  # Created below
+                    event_role=event_role,
+                    output=source_output,
+                    branch=branch_name,
+                    role=code_pipeline_role,
+                )
+            ],
+        )
+
+        build_stage = code_pipeline.add_stage(
+            stage_name="Build",
+            actions=[
+                codepipeline_actions.CodeBuildAction(
+                    run_order=1,
+                    action_name="Build_Pipeline",
+                    project=pipeline_build,
+                    input=source_output,
+                    outputs=[
+                        pipeline_build_output,
                     ],
-                ),
-                codepipeline.StageProps(
-                    stage_name="Build",
-                    actions=[
-                        codepipeline_actions.CodeBuildAction(
-                            run_order=1,
-                            action_name="Build_Pipeline",
-                            project=pipeline_build,
-                            input=source_output,
-                            outputs=[
-                                pipeline_build_output,
-                            ],
-                            role=code_pipeline_role,
-                        ),
-                    ],
-                ),
-                codepipeline.StageProps(
-                    stage_name="Pipeline",
-                    actions=[
-                        codepipeline_actions.CloudFormationCreateUpdateStackAction(
-                            action_name="Create_CFN_Pipeline",
-                            run_order=1,
-                            template_path=pipeline_build_output.at_path(
-                                "drift-sagemaker-pipeline.template.json"
-                            ),
-                            template_configuration=pipeline_build_output.at_path(
-                                "template-config.json"
-                            ),
-                            stack_name="sagemaker-{}-pipeline".format(project_name),
-                            admin_permissions=False,
-                            deployment_role=cloudformation_role,
-                            replace_on_failure=True,
-                            role=code_pipeline_role,
-                        ),
-                        codepipeline_actions.LambdaInvokeAction(
-                            lambda_=lambda_start_pipeline,
-                            action_name="Start_Pipeline",
-                            user_parameters={"PipelineName": pipeline_name},
-                            run_order=2,
-                            role=code_pipeline_role,
-                        ),
-                    ],
+                    role=code_pipeline_role,
                 ),
             ],
         )
 
-        # Allow event role to start pipeline and code pipeline
-        event_role.add_to_policy(start_pipeline_policy)
-        event_role.add_to_policy(
-            iam.PolicyStatement(
-                actions=["codepipeline:StartPipelineExecution"],
-                resources=[code_pipeline.pipeline_arn],
-            )
+        pipeline_deploy_stage = code_pipeline.add_stage(
+            stage_name="Pipeline",
+            actions=[
+                codepipeline_actions.CloudFormationCreateUpdateStackAction(
+                    action_name="Create_CFN_Pipeline",
+                    run_order=1,
+                    template_path=pipeline_build_output.at_path(
+                        "drift-sagemaker-pipeline.template.json"
+                    ),
+                    stack_name=f"sagemaker-{project_name}-pipeline",
+                    admin_permissions=False,
+                    deployment_role=cloudformation_role,
+                    replace_on_failure=True,
+                    role=code_pipeline_role,
+                ),
+            ],
         )
 
-        # Create an events rule that pickup the endpoint and batch alarms
-        drift_rule = events.CfnRule(
+        # Run the SM pipeline once deployment is successful
+        deployment_success_rule = pipeline_deploy_stage.on_state_change(
+            name="Start pipeline",
+            rule_name=build_rule_name,
+            description="Rule to execute the Model Build pipeline once the pipeline has been deployed",
+            schedule=events.Schedule.expression(retrain_schedule),
+            event_pattern=events.EventPattern(
+                source=["aws.codepipeline"],
+                detail_type=["CodePipeline Stage Execution State Change"],
+                detail={
+                    "state": [
+                        "SUCCEEDED",
+                    ]
+                },
+            ),
+        )
+
+        add_sagemaker_pipeline_target(
+            deployment_success_rule,
+            event_role=event_role,
+            sagemaker_pipeline_arn=sagemaker_pipeline_arn,
+        )
+
+        # Run the pipeline if data drift is detected
+        drift_rule = events.Rule(
             self,
             "DriftRule",
+            enabled=True,
             description="Rule to start SM pipeline when drift has been detected.",
-            name=drift_rule_name,
-            state="ENABLED",
-            event_pattern={
-                "source": ["aws.cloudwatch"],
-                "detail-type": ["CloudWatch Alarm State Change"],
-                "detail": {
+            rule_name=drift_rule_name,
+            event_pattern=events.EventPattern(
+                source=["aws.cloudwatch"],
+                detail_type=["CloudWatch Alarm State Change"],
+                detail={
                     "alarmName": [
                         f"sagemaker-{project_name}-staging-threshold",
                         f"sagemaker-{project_name}-prod-threshold",
@@ -272,23 +224,13 @@ class BuildPipelineConstruct(core.Construct):
                     ],
                     "state": {"value": ["ALARM"]},
                 },
-            },
+            ),
         )
 
-        self.add_sagemaker_pipeline_target(
-            drift_rule, event_role, sagemaker_pipeline_arn
-        )
-
-        schedule_rule = events.CfnRule(
-            self,
-            "ScheduleRule",
-            description="Rule to retrain SM pipeline on a schedule.",
-            name=schedule_rule_name,
-            state="ENABLED",
-            schedule_expression=retrain_schedule,
-        )
-        self.add_sagemaker_pipeline_target(
-            schedule_rule, event_role, sagemaker_pipeline_arn
+        add_sagemaker_pipeline_target(
+            drift_rule,
+            event_role=event_role,
+            sagemaker_pipeline_arn=sagemaker_pipeline_arn,
         )
 
         # Load the lambda pipeline change code
@@ -303,7 +245,7 @@ class BuildPipelineConstruct(core.Construct):
             role=lambda_role,
             handler="index.lambda_handler",
             runtime=lambda_.Runtime.PYTHON_3_8,
-            timeout=core.Duration.seconds(3),
+            timeout=cdk.Duration.seconds(3),
             memory_size=128,
             environment={
                 "LOG_LEVEL": "INFO",
@@ -381,27 +323,3 @@ class BuildPipelineConstruct(core.Construct):
                 )
             ],
         )
-
-    def add_sagemaker_pipeline_target(
-        self,
-        rule: events.CfnRule,
-        event_role: iam.Role,
-        sagemaker_pipeline_arn: str,
-    ) -> None:
-        """Use events.CfnRule instead of events.Rule to accommodate
-        [custom target](https://github.com/aws/aws-cdk/issues/14887)
-
-        Args:
-            rule (events.IRule): The event rule to add Target
-            event_role (iam.Role): The event role
-            sagemaker_pipeline_arn (str): The SageMaker Pipeline ARN
-        """
-        sagemaker_pipeline_target = {
-            "Arn": sagemaker_pipeline_arn,
-            "Id": "Target0",
-            "RoleArn": event_role.role_arn,
-            "SageMakerPipelineParameters": {
-                "PipelineParameterList": [{"Name": "InputSource", "Value": rule.name}]
-            },
-        }
-        rule.add_property_override("Targets", [sagemaker_pipeline_target])

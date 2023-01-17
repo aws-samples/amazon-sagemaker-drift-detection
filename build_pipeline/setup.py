@@ -14,12 +14,7 @@ setuptools.setup(
     author="amazon",
     package_dir={"": "infra"},
     packages=setuptools.find_packages(where="infra"),
-    install_requires=[
-        "boto3==1.20.19",
-        "aws-cdk.core==1.116.0",
-        "aws-cdk.aws-sagemaker==1.116.0",
-        "sagemaker==2.70.0",
-    ],
+    install_requires=[],
     python_requires=">=3.8",
     classifiers=[
         "Development Status :: 4 - Beta",

@@ -1,0 +1,17 @@
+version: '0.2'
+phases:
+  install:
+    runtime-versions:
+      nodejs: '16'
+      python: '3.9'
+    commands:
+    - npm install aws-cdk@2.46.0
+    - npm update
+    - python -m pip install -r requirements.txt
+  build:
+    commands:
+    - npx cdk synth -o dist --path-metadata false
+artifacts:
+  base-directory: dist
+  files:
+    - "*.template.json"

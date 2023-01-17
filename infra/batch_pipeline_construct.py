@@ -1,27 +1,28 @@
-from aws_cdk import (
-    core,
-    aws_codebuild as codebuild,
-    aws_codecommit as codecommit,
-    aws_codepipeline as codepipeline,
-    aws_codepipeline_actions as codepipeline_actions,
-    aws_events as events,
-    aws_events_targets as targets,
-    aws_iam as iam,
-    aws_lambda as lambda_,
-    aws_s3 as s3,
-)
+import aws_cdk as cdk
+from aws_cdk import aws_codebuild as codebuild
+from aws_cdk import aws_codecommit as codecommit
+from aws_cdk import aws_codepipeline as codepipeline
+from aws_cdk import aws_codepipeline_actions as codepipeline_actions
+from aws_cdk import aws_events as events
+from aws_cdk import aws_events_targets as targets
+from aws_cdk import aws_iam as iam
+from aws_cdk import aws_lambda as lambda_
+from aws_cdk import aws_s3 as s3
+from constructs import Construct
+
+from infra.sagemaker_pipelines_event_target import add_sagemaker_pipeline_target
 
 
-class BatchPipelineConstruct(core.Construct):
+class BatchPipelineConstruct(Construct):
     """
     Batch pipeline construct
     """
 
     def __init__(
         self,
-        scope: core.Construct,
+        scope: Construct,
         construct_id: str,
-        env: core.Environment,
+        env: cdk.Environment,
         sagemaker_execution_role: iam.Role,
         code_pipeline_role: iam.Role,
         code_build_role: iam.Role,
@@ -54,8 +55,8 @@ class BatchPipelineConstruct(core.Construct):
                 branch_name=branch_name,
             ),
             tags=[
-                core.CfnTag(key="sagemaker:project-id", value=project_id),
-                core.CfnTag(key="sagemaker:project-name", value=project_name),
+                cdk.CfnTag(key="sagemaker:project-id", value=project_id),
+                cdk.CfnTag(key="sagemaker:project-name", value=project_name),
             ],
         )
 
@@ -73,14 +74,6 @@ class BatchPipelineConstruct(core.Construct):
         code_pipeline_name = f"sagemaker-{project_name}-{construct_id}"
         schedule_rule_name = f"sagemaker-{project_name}-schedule-{construct_id}"
 
-        # It seems the code build job requires  permissions to CreateBucket, despite the fact this exists
-        code_build_role.add_to_policy(
-            iam.PolicyStatement(
-                actions=["s3:CreateBucket"],
-                resources=[s3_artifact.bucket_arn],
-            )
-        )
-
         # Define AWS CodeBuild spec to run node.js and python
         # https://docs.aws.amazon.com/codebuild/latest/userguide/available-runtimes.html
         pipeline_build = codebuild.PipelineProject(
@@ -88,38 +81,8 @@ class BatchPipelineConstruct(core.Construct):
             "PipelineBuild",
             project_name="sagemaker-{}-{}".format(project_name, construct_id),
             role=code_build_role,
-            build_spec=codebuild.BuildSpec.from_object(
-                dict(
-                    version="0.2",
-                    phases=dict(
-                        install={
-                            "runtime-versions": {
-                                "nodejs": "12",
-                                "python": "3.8",
-                            },
-                            "commands": [
-                                "npm install aws-cdk",
-                                "npm update",
-                                "python -m pip install --upgrade pip",
-                                "python -m pip install -r requirements.txt",
-                            ],
-                        },
-                        build=dict(
-                            commands=[
-                                "npx cdk synth -o dist --path-metadata false",
-                            ]
-                        ),
-                    ),
-                    artifacts={
-                        "base-directory": "dist",
-                        "files": [
-                            "*.template.json",
-                        ],
-                    },
-                )
-            ),
             environment=codebuild.BuildEnvironment(
-                build_image=codebuild.LinuxBuildImage.AMAZON_LINUX_2_3,
+                build_image=codebuild.LinuxBuildImage.AMAZON_LINUX_2_4,
                 environment_variables={
                     "SAGEMAKER_PROJECT_NAME": codebuild.BuildEnvironmentVariable(
                         value=project_name
@@ -226,16 +189,19 @@ class BatchPipelineConstruct(core.Construct):
             ],
         )
 
-        schedule_rule = events.CfnRule(
+        schedule_rule = events.Rule(
             self,
             "ScheduleRule",
+            enabled=True,
             description="Rule to run batch SM pipeline on a schedule.",
-            name=schedule_rule_name,
-            state="ENABLED",
-            schedule_expression=batch_schedule,
+            rule_name=schedule_rule_name,
+            schedule=events.Schedule.expression(batch_schedule),
         )
-        self.add_sagemaker_pipeline_target(
-            schedule_rule, event_role, sagemaker_pipeline_arn
+
+        add_sagemaker_pipeline_target(
+            schedule_rule,
+            event_role=event_role,
+            sagemaker_pipeline_arn=sagemaker_pipeline_arn,
         )
 
         # Load the lambda pipeline change code
@@ -250,7 +216,7 @@ class BatchPipelineConstruct(core.Construct):
             role=lambda_role,
             handler="index.lambda_handler",
             runtime=lambda_.Runtime.PYTHON_3_8,
-            timeout=core.Duration.seconds(3),
+            timeout=cdk.Duration.seconds(3),
             memory_size=128,
             environment={
                 "LOG_LEVEL": "INFO",
@@ -306,14 +272,6 @@ class BatchPipelineConstruct(core.Construct):
             targets=[targets.LambdaFunction(handler=lambda_pipeline_change)],
         )
 
-        # Allow event role to start code pipeline
-        event_role.add_to_policy(
-            iam.PolicyStatement(
-                actions=["codepipeline:StartPipelineExecution"],
-                resources=[code_pipeline.pipeline_arn],
-            )
-        )
-
         # Add deploy role to target the code pipeline when model package is approved
         events.Rule(
             self,
@@ -362,27 +320,3 @@ class BatchPipelineConstruct(core.Construct):
                 )
             ],
         )
-
-    def add_sagemaker_pipeline_target(
-        self,
-        rule: events.CfnRule,
-        event_role: iam.Role,
-        sagemaker_pipeline_arn: str,
-    ) -> None:
-        """Use events.CfnRule instead of events.Rule to accommodate
-        [custom target](https://github.com/aws/aws-cdk/issues/14887)
-
-        Args:
-            rule (events.IRule): The event rule to add Target
-            event_role (iam.Role): The event role
-            sagemaker_pipeline_arn (str): The SageMaker Pipeline ARN
-        """
-        sagemaker_pipeline_target = {
-            "Arn": sagemaker_pipeline_arn,
-            "Id": "Target0",
-            "RoleArn": event_role.role_arn,
-            "SageMakerPipelineParameters": {
-                "PipelineParameterList": [{"Name": "InputSource", "Value": rule.name}]
-            },
-        }
-        rule.add_property_override("Targets", [sagemaker_pipeline_target])
