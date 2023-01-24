@@ -35,6 +35,7 @@ from sagemaker.workflow.parameters import (
     ParameterString,
 )
 from sagemaker.workflow.pipeline import Pipeline
+from sagemaker.workflow.pipeline_context import PipelineSession
 from sagemaker.workflow.steps import (
     CreateModelStep,
     ProcessingStep,
@@ -68,12 +69,10 @@ def get_session(region, default_bucket):
     boto_session = boto3.Session(region_name=region)
 
     sagemaker_client = boto_session.client("sagemaker")
-    runtime_client = boto_session.client("sagemaker-runtime")
-    return sagemaker.session.Session(
+    return PipelineSession(
         boto_session=boto_session,
         sagemaker_client=sagemaker_client,
-        sagemaker_runtime_client=runtime_client,
-        default_bucket=default_bucket,
+        default_bucket=default_bucket,     
     )
 
 
