@@ -7,7 +7,6 @@
 
 Implements a get_pipeline(**kwargs) method.
 """
-import json
 import os
 
 import boto3
@@ -22,7 +21,6 @@ from sagemaker.model_monitor.dataset_format import DatasetFormat
 from sagemaker.processing import (
     ProcessingInput,
     ProcessingOutput,
-    Processor,
     ScriptProcessor,
 )
 from sagemaker.s3 import S3Uploader
@@ -33,16 +31,15 @@ from sagemaker.workflow.condition_step import ConditionStep, JsonGet
 from sagemaker.workflow.conditions import ConditionLessThanOrEqualTo
 from sagemaker.workflow.execution_variables import ExecutionVariables
 from sagemaker.workflow.functions import Join
+from sagemaker.workflow.model_step import ModelStep
 from sagemaker.workflow.parameters import ParameterInteger, ParameterString
 from sagemaker.workflow.pipeline import Pipeline
 from sagemaker.workflow.pipeline_context import PipelineSession
 from sagemaker.workflow.properties import PropertyFile
 from sagemaker.workflow.quality_check_step import (
     DataQualityCheckConfig,
-    ModelQualityCheckConfig,
     QualityCheckStep,
 )
-from sagemaker.workflow.step_collections import RegisterModel
 from sagemaker.workflow.steps import CacheConfig, ProcessingStep, TrainingStep
 
 BASE_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -63,7 +60,7 @@ def get_session(region, default_bucket):
     return PipelineSession(
         boto_session=boto_session,
         sagemaker_client=sagemaker_client,
-        default_bucket=default_bucket,     
+        default_bucket=default_bucket,
     )
 
 
@@ -125,47 +122,52 @@ def get_pipeline(
         default_value=f"s3://{default_bucket}/{base_job_prefix}/baseline/",
     )
 
-    # Create cache configuration (Unable to pass parameter for expire_after value)
+    # Cache configuration (Unable to pass parameter for expire_after value)
     cache_config = CacheConfig(enable_caching=False, expire_after="PT1H")
 
     # processing step for feature engineering
+    inputs = [
+        ProcessingInput(
+            source=input_data,
+            destination="/opt/ml/processing/input/data",
+            s3_data_distribution_type="ShardedByS3Key",
+        ),
+        ProcessingInput(
+            source=input_zones,
+            destination="/opt/ml/processing/input/zones",
+            s3_data_distribution_type="FullyReplicated",
+        ),
+    ]
+
+    outputs = [
+        ProcessingOutput(output_name="train", source="/opt/ml/processing/train"),
+        ProcessingOutput(
+            output_name="validation", source="/opt/ml/processing/validation"
+        ),
+        ProcessingOutput(output_name="test", source="/opt/ml/processing/test"),
+        ProcessingOutput(output_name="baseline", source="/opt/ml/processing/baseline"),
+    ]
+
     sklearn_processor = SKLearnProcessor(
         framework_version="0.23-1",
-        instance_type=processing_instance_type,
-        instance_count=processing_instance_count,
-        base_job_name=f"{base_job_prefix}/sklearn-preprocess",
-        sagemaker_session=sagemaker_session,
         role=role,
+        instance_type=processing_instance_type,
+        instance_count=processing_instance_type,
+        sagemaker_session=sagemaker_session,
+        base_job_name=f"{base_job_prefix}/sklearn-preprocess",
     )
+
     step_process = ProcessingStep(
         name="PreprocessData",
-        processor=sklearn_processor,
-        inputs=[
-            ProcessingInput(
-                source=input_data,
-                destination="/opt/ml/processing/input/data",
-                s3_data_distribution_type="ShardedByS3Key",
-            ),
-            ProcessingInput(
-                source=input_zones,
-                destination="/opt/ml/processing/input/zones",
-                s3_data_distribution_type="FullyReplicated",
-            ),
-        ],
-        outputs=[
-            ProcessingOutput(output_name="train", source="/opt/ml/processing/train"),
-            ProcessingOutput(
-                output_name="validation", source="/opt/ml/processing/validation"
-            ),
-            ProcessingOutput(output_name="test", source="/opt/ml/processing/test"),
-            ProcessingOutput(
-                output_name="baseline", source="/opt/ml/processing/baseline"
-            ),
-        ],
-        code=os.path.join(BASE_DIR, "preprocess.py"),
+        step_args=sklearn_processor.run(
+            inputs=inputs,
+            outputs=outputs,
+            code=os.path.join(BASE_DIR, "preprocess.py"),
+        ),
         cache_config=cache_config,
     )
 
+    # Data Quality Baseline step
     check_job_config = CheckJobConfig(
         role=role,
         instance_count=1,
@@ -174,9 +176,11 @@ def get_pipeline(
     )
 
     data_quality_check_config = DataQualityCheckConfig(
-        baseline_dataset=step_process.properties.ProcessingOutputConfig.Outputs[
-            "baseline"
-        ].S3Output.S3Uri,
+        baseline_dataset=(
+            step_process.properties.ProcessingOutputConfig.Outputs[
+                "baseline"
+            ].S3Output.S3Uri
+        ),
         dataset_format=DatasetFormat.csv(),
         output_s3_uri=Join(
             on="/",
@@ -236,23 +240,25 @@ def get_pipeline(
         min_child_weight=300,
         subsample=0.8,
     )
+
     step_train = TrainingStep(
         name="TrainModel",
-        estimator=xgb_train,
-        inputs={
-            "train": TrainingInput(
-                s3_data=step_process.properties.ProcessingOutputConfig.Outputs[
-                    "train"
-                ].S3Output.S3Uri,
-                content_type="text/csv",
-            ),
-            "validation": TrainingInput(
-                s3_data=step_process.properties.ProcessingOutputConfig.Outputs[
-                    "validation"
-                ].S3Output.S3Uri,
-                content_type="text/csv",
-            ),
-        },
+        step_args=xgb_train.fit(
+            inputs={
+                "train": TrainingInput(
+                    s3_data=step_process.properties.ProcessingOutputConfig.Outputs[
+                        "train"
+                    ].S3Output.S3Uri,
+                    content_type="text/csv",
+                ),
+                "validation": TrainingInput(
+                    s3_data=step_process.properties.ProcessingOutputConfig.Outputs[
+                        "validation"
+                    ].S3Output.S3Uri,
+                    content_type="text/csv",
+                ),
+            }
+        ),
         cache_config=cache_config,
     )
 
@@ -273,25 +279,26 @@ def get_pipeline(
     )
     step_eval = ProcessingStep(
         name="EvaluateModel",
-        processor=script_eval,
-        inputs=[
-            ProcessingInput(
-                source=step_train.properties.ModelArtifacts.S3ModelArtifacts,
-                destination="/opt/ml/processing/model",
-            ),
-            ProcessingInput(
-                source=step_process.properties.ProcessingOutputConfig.Outputs[
-                    "test"
-                ].S3Output.S3Uri,
-                destination="/opt/ml/processing/test",
-            ),
-        ],
-        outputs=[
-            ProcessingOutput(
-                output_name="evaluation", source="/opt/ml/processing/evaluation"
-            ),
-        ],
-        code=os.path.join(BASE_DIR, "evaluate.py"),
+        step_args=script_eval.run(
+            inputs=[
+                ProcessingInput(
+                    source=step_train.properties.ModelArtifacts.S3ModelArtifacts,
+                    destination="/opt/ml/processing/model",
+                ),
+                ProcessingInput(
+                    source=step_process.properties.ProcessingOutputConfig.Outputs[
+                        "test"
+                    ].S3Output.S3Uri,
+                    destination="/opt/ml/processing/test",
+                ),
+            ],
+            outputs=[
+                ProcessingOutput(
+                    output_name="evaluation", source="/opt/ml/processing/evaluation"
+                ),
+            ],
+            code=os.path.join(BASE_DIR, "evaluate.py"),
+        ),
         property_files=[evaluation_report],
         cache_config=cache_config,
     )
@@ -327,18 +334,18 @@ def get_pipeline(
         ),
     )
 
-    step_register = RegisterModel(
+    step_register = ModelStep(
         name="RegisterModel",
-        estimator=xgb_train,
-        model_data=step_train.properties.ModelArtifacts.S3ModelArtifacts,
-        content_types=["text/csv"],
-        response_types=["text/csv"],
-        inference_instances=["ml.t2.medium", "ml.t2.large", "ml.m5.large"],
-        transform_instances=["ml.m5.large"],
-        model_package_group_name=model_package_group_name,
-        approval_status=model_approval_status,
-        model_metrics=model_metrics,
-        drift_check_baselines=drift_check_baselines,
+        step_args=xgb_train.register(
+            content_types=["text/csv"],
+            response_types=["text/csv"],
+            inference_instances=["ml.t2.medium", "ml.t2.large", "ml.m5.large"],
+            transform_instances=["ml.m5.large"],
+            model_package_group_name=model_package_group_name,
+            approval_status=model_approval_status,
+            model_metrics=model_metrics,
+            drift_check_baselines=drift_check_baselines,
+        ),
     )
 
     # condition step for evaluating model quality and branching execution
