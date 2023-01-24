@@ -16,13 +16,10 @@ from sagemaker.debugger import Rule, rule_configs
 from sagemaker.drift_check_baselines import DriftCheckBaselines
 from sagemaker.estimator import Estimator
 from sagemaker.inputs import TrainingInput
+from sagemaker.model import Model
 from sagemaker.model_metrics import MetricsSource, ModelMetrics
 from sagemaker.model_monitor.dataset_format import DatasetFormat
-from sagemaker.processing import (
-    ProcessingInput,
-    ProcessingOutput,
-    ScriptProcessor,
-)
+from sagemaker.processing import ProcessingInput, ProcessingOutput, ScriptProcessor
 from sagemaker.s3 import S3Uploader
 from sagemaker.sklearn.processing import SKLearnProcessor
 from sagemaker.utils import name_from_base
@@ -152,7 +149,7 @@ def get_pipeline(
         framework_version="0.23-1",
         role=role,
         instance_type=processing_instance_type,
-        instance_count=processing_instance_type,
+        instance_count=processing_instance_count,
         sagemaker_session=sagemaker_session,
         base_job_name=f"{base_job_prefix}/sklearn-preprocess",
     )
@@ -334,9 +331,16 @@ def get_pipeline(
         ),
     )
 
+    model = Model(
+        image_uri=image_uri,
+        model_data=step_train.properties.ModelArtifacts.S3ModelArtifacts,
+        sagemaker_session=sagemaker_session,
+        role=role,
+    )
+
     step_register = ModelStep(
         name="RegisterModel",
-        step_args=xgb_train.register(
+        step_args=model.register(
             content_types=["text/csv"],
             response_types=["text/csv"],
             inference_instances=["ml.t2.medium", "ml.t2.large", "ml.m5.large"],
@@ -394,7 +398,8 @@ def upload_pipeline(pipeline: Pipeline, default_bucket, base_job_prefix):
     S3Uploader.upload_string_as_file_body(
         pipeline_definition_body, f"s3://{default_bucket}/{pipeline_name}.json"
     )
-    # Return JSON with parameters used in Cfn Stack creation as template-configuration.json
+    # Return JSON with parameters used in Cfn Stack creation as
+    # template-configuration.json
     return {
         "PipelineDefinitionBucket": default_bucket,
         "PipelineDefinitionKey": f"{pipeline_name}.json",
