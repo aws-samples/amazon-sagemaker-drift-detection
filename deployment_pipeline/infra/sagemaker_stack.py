@@ -25,15 +25,15 @@ class SageMakerStack(cdk.Stack):
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        # Select the variant config and name - needs to be same for updating Endpoint or Autoscaling deregister fails
+        # Select the variant config and name - needs to be same for updating Endpoint or
+        # Autoscaling deregister fails
         # see: https://docs.aws.amazon.com/sagemaker/latest/dg/endpoint-scaling.html
         variant_config = deployment_config.variant_config
-        variant_name = variant_config.variant_name or "LatestApproved"
 
         # Do not use a custom named resource for models as these get replaced
         model = sagemaker.CfnModel(
             self,
-            variant_name,
+            variant_config.variant_name,
             execution_role_arn=sagemaker_execution_role,
             primary_container=sagemaker.CfnModel.ContainerDefinitionProperty(
                 model_package_name=variant_config.model_package_arn,
@@ -46,7 +46,7 @@ class SageMakerStack(cdk.Stack):
             initial_variant_weight=variant_config.initial_variant_weight,
             instance_type=variant_config.instance_type,
             model_name=model.attr_model_name,
-            variant_name=variant_name,
+            variant_name=variant_config.variant_name,
         )
 
         endpoint_config = sagemaker.CfnEndpointConfig(
@@ -141,7 +141,7 @@ class SageMakerStack(cdk.Stack):
                 ),
                 tags=tags,
             )
-            monitoring_schedule.add_depends_on(endpoint)
+            monitoring_schedule.add_dependency(endpoint)
 
             drift_alarm = cloudwatch.CfnAlarm(
                 self,
@@ -165,10 +165,10 @@ class SageMakerStack(cdk.Stack):
                 datapoints_to_alarm=deployment_config.schedule_config.datapoints_to_alarm,
                 statistic=deployment_config.schedule_config.statistic,
             )
-            drift_alarm.add_depends_on(monitoring_schedule)
+            drift_alarm.add_dependency(monitoring_schedule)
 
         if deployment_config.auto_scaling is not None:
-            resource_id = f"endpoint/{endpoint_name}/variant/{variant_name}"
+            resource_id = f"endpoint/{endpoint_name}/variant/{variant_config.variant_name}"
 
             scalable_target = applicationautoscaling.CfnScalableTarget(
                 self,
@@ -180,7 +180,7 @@ class SageMakerStack(cdk.Stack):
                 scalable_dimension="sagemaker:variant:DesiredInstanceCount",
                 service_namespace="sagemaker",
             )
-            scalable_target.add_depends_on(endpoint)
+            scalable_target.add_dependency(endpoint)
 
             scaling_policy = applicationautoscaling.CfnScalingPolicy(
                 self,
@@ -189,7 +189,7 @@ class SageMakerStack(cdk.Stack):
                 policy_type="TargetTrackingScaling",
                 resource_id=resource_id,
                 scalable_dimension="sagemaker:variant:DesiredInstanceCount",
-                service_namespace="sagemaker",  # Note: This is different to scaling above
+                service_namespace="sagemaker",  # Note: different to scaling above
                 target_tracking_scaling_policy_configuration=applicationautoscaling.CfnScalingPolicy.TargetTrackingScalingPolicyConfigurationProperty(
                     target_value=deployment_config.auto_scaling.target_value,
                     scale_in_cooldown=deployment_config.auto_scaling.scale_in_cooldown,
@@ -199,7 +199,7 @@ class SageMakerStack(cdk.Stack):
                     ),
                 ),
             )
-            scaling_policy.add_depends_on(scalable_target)
+            scaling_policy.add_dependency(scalable_target)
 
             # TODO: Add cloud watch alarm
 

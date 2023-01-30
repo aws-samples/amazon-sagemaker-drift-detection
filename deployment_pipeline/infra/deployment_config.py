@@ -7,7 +7,7 @@ class InstanceConfig:
 class VariantConfig(InstanceConfig):
     def __init__(
         self,
-        model_package_version: str,
+        model_package_version: str = None,
         initial_variant_weight: float = 1.0,
         variant_name: str = None,
         instance_count: int = 1,
