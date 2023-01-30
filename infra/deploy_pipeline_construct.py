@@ -101,13 +101,14 @@ class DeployPipelineConstruct(Construct):
             pipeline_name=f"sagemaker-{project_name}-{construct_id}",
         )
 
-        source_stage = code_pipeline.add_stage(
+        _  = code_pipeline.add_stage(
             stage_name="Source",
             actions=[
                 codepipeline_actions.CodeCommitSourceAction(
                     action_name="CodeCommit_Source",
                     repository=code,
-                    trigger=codepipeline_actions.CodeCommitTrigger.NONE,  # Created below
+                    # Created rule below to give it a custom name
+                    trigger=codepipeline_actions.CodeCommitTrigger.NONE,
                     event_role=event_role,
                     output=source_output,
                     branch=branch_name,
@@ -116,7 +117,7 @@ class DeployPipelineConstruct(Construct):
             ],
         )
 
-        build_stage = code_pipeline.add_stage(
+        _  = code_pipeline.add_stage(
             stage_name="Build",
             actions=[
                 codepipeline_actions.CodeBuildAction(
@@ -132,7 +133,7 @@ class DeployPipelineConstruct(Construct):
         )
 
         staging_stack_name = f"sagemaker-{project_name}-{construct_id}-staging"
-        staging_deploy_stage = code_pipeline.add_stage(
+        _ = code_pipeline.add_stage(
             stage_name="DeployStaging",
             actions=[
                 codepipeline_actions.CloudFormationCreateUpdateStackAction(
@@ -155,7 +156,7 @@ class DeployPipelineConstruct(Construct):
                 ),
             ],
         )
-        production_deploy_stage = code_pipeline.add_stage(
+        _ = code_pipeline.add_stage(
             stage_name="DeployProd",
             actions=[
                 codepipeline_actions.CloudFormationCreateUpdateStackAction(
@@ -171,6 +172,7 @@ class DeployPipelineConstruct(Construct):
                     replace_on_failure=True,
                 ),
                 codepipeline_actions.CloudFormationDeleteStackAction(
+                    action_name="Delete_CFN_Staging",
                     stack_name=staging_stack_name,
                     admin_permissions=False,
                     deployment_role=cloudformation_role,
@@ -183,7 +185,8 @@ class DeployPipelineConstruct(Construct):
             self,
             "ModelRegistryRule",
             rule_name=f"sagemaker-{project_name}-modelregistry-{construct_id}",
-            description="Rule to trigger a deployment when SageMaker Model registry is updated with a new model package.",
+            description="Rule to trigger a deployment when SageMaker Model registry "
+            "is updated with a new model package.",
             event_pattern=events.EventPattern(
                 source=["aws.sagemaker"],
                 detail_type=["SageMaker Model Package State Change"],
@@ -206,7 +209,8 @@ class DeployPipelineConstruct(Construct):
             self,
             "CodeCommitRule",
             rule_name=f"sagemaker-{project_name}-codecommit-{construct_id}",
-            description="Rule to trigger a deployment when configuration is updated in CodeCommit.",
+            description="Rule to trigger a deployment when configuration is updated "
+            "in CodeCommit.",
             event_pattern=events.EventPattern(
                 source=["aws.codecommit"],
                 detail_type=["CodeCommit Repository State Change"],

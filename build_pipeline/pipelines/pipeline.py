@@ -203,7 +203,7 @@ def get_pipeline(
             outputs=outputs,
             code="preprocess.py",
             source_dir=os.path.join(BASE_DIR, "preprocess"),
-            job_name=f"{commit_id}/scripts/preprocess",
+            job_name=f"scripts/{commit_id[:8]}/preprocess",
         ),
         cache_config=cache_config,
     )
@@ -279,7 +279,7 @@ def get_pipeline(
     step_train = TrainingStep(
         name="TrainModel",
         step_args=xgb_train.fit(
-            job_name=f"{commit_id}/scripts/train",
+            job_name=f"scripts/{commit_id[:8]}/train",
             inputs={
                 "train": TrainingInput(
                     s3_data=step_process.properties.ProcessingOutputConfig.Outputs[
@@ -315,7 +315,7 @@ def get_pipeline(
     step_eval = ProcessingStep(
         name="EvaluateModel",
         step_args=script_eval.run(
-            job_name=f"{commit_id}/scripts/evaluation",
+            job_name=f"scripts/{commit_id[:8]}/evaluation",
             inputs=[
                 ProcessingInput(
                     source=step_train.properties.ModelArtifacts.S3ModelArtifacts,
