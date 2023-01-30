@@ -130,6 +130,8 @@ class DeployPipelineConstruct(Construct):
                 ),
             ],
         )
+
+        staging_stack_name = f"sagemaker-{project_name}-{construct_id}-staging"
         staging_deploy_stage = code_pipeline.add_stage(
             stage_name="DeployStaging",
             actions=[
@@ -139,7 +141,7 @@ class DeployPipelineConstruct(Construct):
                     template_path=cdk_build_output.at_path(
                         "drift-deploy-staging.template.json"
                     ),
-                    stack_name=f"sagemaker-{project_name}-{construct_id}-staging",
+                    stack_name=staging_stack_name,
                     admin_permissions=False,
                     deployment_role=cloudformation_role,
                     role=code_pipeline_role,
@@ -168,10 +170,15 @@ class DeployPipelineConstruct(Construct):
                     role=code_pipeline_role,
                     replace_on_failure=True,
                 ),
+                codepipeline_actions.CloudFormationDeleteStackAction(
+                    stack_name=staging_stack_name,
+                    admin_permissions=False,
+                    deployment_role=cloudformation_role,
+                    role=code_pipeline_role,
+                ),
             ],
         )
 
-        # Add deploy role to target the code pipeline when model package is approved
         events.Rule(
             self,
             "ModelRegistryRule",

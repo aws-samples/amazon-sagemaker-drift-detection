@@ -133,19 +133,18 @@ class BuildPipelineConstruct(Construct):
             pipeline_name=code_pipeline_name,
         )
 
+        source_action = codepipeline_actions.CodeCommitSourceAction(
+            action_name="CodeCommit_Source",
+            repository=code,
+            # trigger=codepipeline_actions.CodeCommitTrigger.NONE,  # Created below
+            event_role=event_role,
+            output=source_output,
+            branch=branch_name,
+            role=code_pipeline_role,
+        )
         source_stage = code_pipeline.add_stage(
             stage_name="Source",
-            actions=[
-                codepipeline_actions.CodeCommitSourceAction(
-                    action_name="CodeCommit_Source",
-                    repository=code,
-                    trigger=codepipeline_actions.CodeCommitTrigger.NONE,  # Created below
-                    event_role=event_role,
-                    output=source_output,
-                    branch=branch_name,
-                    role=code_pipeline_role,
-                )
-            ],
+            actions=[source_action],
         )
 
         build_stage = code_pipeline.add_stage(
@@ -160,6 +159,9 @@ class BuildPipelineConstruct(Construct):
                         pipeline_build_output,
                     ],
                     role=code_pipeline_role,
+                    environment_variables={
+                        "COMMIT_ID": source_action.variables.commit_id,
+                    },
                 ),
             ],
         )
@@ -301,25 +303,25 @@ class BuildPipelineConstruct(Construct):
             targets=[targets.LambdaFunction(lambda_pipeline_change)],
         )
 
-        events.Rule(
-            self,
-            "CodeCommitRule",
-            rule_name=f"sagemaker-{project_name}-codecommit-{construct_id}",
-            description="Rule to trigger a build when code is updated in CodeCommit.",
-            event_pattern=events.EventPattern(
-                source=["aws.codecommit"],
-                detail_type=["CodeCommit Repository State Change"],
-                detail={
-                    "event": ["referenceCreated", "referenceUpdated"],
-                    "referenceType": ["branch"],
-                    "referenceName": [branch_name],
-                },
-                resources=[code.repository_arn],
-            ),
-            targets=[
-                targets.CodePipeline(
-                    pipeline=code_pipeline,
-                    event_role=event_role,
-                )
-            ],
-        )
+        # events.Rule(
+        #     self,
+        #     "CodeCommitRule",
+        #     rule_name=f"sagemaker-{project_name}-codecommit-{construct_id}",
+        #     description="Rule to trigger a build when code is updated in CodeCommit.",
+        #     event_pattern=events.EventPattern(
+        #         source=["aws.codecommit"],
+        #         detail_type=["CodeCommit Repository State Change"],
+        #         detail={
+        #             "event": ["referenceCreated", "referenceUpdated"],
+        #             "referenceType": ["branch"],
+        #             "referenceName": [branch_name],
+        #         },
+        #         resources=[code.repository_arn],
+        #     ),
+        #     targets=[
+        #         targets.CodePipeline(
+        #             pipeline=code_pipeline,
+        #             event_role=event_role,
+        #         )
+        #     ],
+        # )
