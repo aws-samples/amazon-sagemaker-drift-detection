@@ -3,8 +3,13 @@ import logging
 import aws_cdk as cdk
 from aws_cdk import aws_applicationautoscaling as applicationautoscaling
 from aws_cdk import aws_cloudwatch as cloudwatch
+from aws_cdk import aws_events as events
 from aws_cdk import aws_sagemaker as sagemaker
 from constructs import Construct
+
+from infra.endpoint_lineage import get_pipeline_arn
+from infra.sagemaker_pipelines_event_target import add_sagemaker_pipeline_target
+from infra.sagemaker_service_catalog_roles_construct import SageMakerSCRoles
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +30,8 @@ class SageMakerStack(cdk.Stack):
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        # Select the variant config and name - needs to be same for updating Endpoint or Autoscaling deregister fails
+        # Select the variant config and name - needs to be same for updating Endpoint
+        # or Autoscaling deregister fails
         # see: https://docs.aws.amazon.com/sagemaker/latest/dg/endpoint-scaling.html
         variant_config = deployment_config.variant_config
         variant_name = variant_config.variant_name or "LatestApproved"
@@ -141,7 +147,7 @@ class SageMakerStack(cdk.Stack):
                 ),
                 tags=tags,
             )
-            monitoring_schedule.add_depends_on(endpoint)
+            monitoring_schedule.add_dependency(endpoint)
 
             drift_alarm = cloudwatch.CfnAlarm(
                 self,
@@ -165,7 +171,41 @@ class SageMakerStack(cdk.Stack):
                 datapoints_to_alarm=deployment_config.schedule_config.datapoints_to_alarm,
                 statistic=deployment_config.schedule_config.statistic,
             )
-            drift_alarm.add_depends_on(monitoring_schedule)
+            drift_alarm.add_dependency(monitoring_schedule)
+
+            ### add rule to run build pipeline
+            # Run the pipeline if data drift is detected
+            drift_rule_name = f"sagemaker-{endpoint_name}-drift-{construct_id}"
+            drift_rule = events.Rule(
+                self,
+                "DriftRule",
+                enabled=True,
+                description="Rule to start SM pipeline when drift has been detected.",
+                rule_name=drift_rule_name,
+                event_pattern=events.EventPattern(
+                    source=["aws.cloudwatch"],
+                    detail_type=["CloudWatch Alarm State Change"],
+                    detail={
+                        "alarmName": [
+                            drift_alarm.alarm_name,
+                        ],
+                        "state": {"value": ["ALARM"]},
+                    },
+                ),
+            )
+
+            sm_roles = SageMakerSCRoles(self, "SmRoles", mutable=False)
+            event_role = sm_roles.events_role
+            execution_role = sm_roles.execution_role
+            pipeline_arn = get_pipeline_arn(
+                endpoint_name=endpoint.attr_endpoint_name,
+                sagemaker_execution_role=execution_role.role_arn,
+            )
+            add_sagemaker_pipeline_target(
+                drift_rule,
+                event_role=event_role,
+                sagemaker_pipeline_arn=pipeline_arn,
+            )
 
         if deployment_config.auto_scaling is not None:
             resource_id = f"endpoint/{endpoint_name}/variant/{variant_name}"
@@ -180,7 +220,7 @@ class SageMakerStack(cdk.Stack):
                 scalable_dimension="sagemaker:variant:DesiredInstanceCount",
                 service_namespace="sagemaker",
             )
-            scalable_target.add_depends_on(endpoint)
+            scalable_target.add_dependency(endpoint)
 
             scaling_policy = applicationautoscaling.CfnScalingPolicy(
                 self,
@@ -199,7 +239,7 @@ class SageMakerStack(cdk.Stack):
                     ),
                 ),
             )
-            scaling_policy.add_depends_on(scalable_target)
+            scaling_policy.add_dependency(scalable_target)
 
             # TODO: Add cloud watch alarm
 

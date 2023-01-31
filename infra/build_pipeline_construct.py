@@ -186,7 +186,8 @@ class BuildPipelineConstruct(Construct):
         deployment_success_rule = pipeline_deploy_stage.on_state_change(
             name="Start pipeline",
             rule_name=build_rule_name,
-            description="Rule to execute the Model Build pipeline once the pipeline has been deployed",
+            description="Rule to execute the Model Build pipeline once "
+            "the pipeline has been deployed",
             schedule=events.Schedule.expression(retrain_schedule),
             event_pattern=events.EventPattern(
                 source=["aws.codepipeline"],
@@ -205,33 +206,6 @@ class BuildPipelineConstruct(Construct):
             sagemaker_pipeline_arn=sagemaker_pipeline_arn,
         )
 
-        # Run the pipeline if data drift is detected
-        drift_rule = events.Rule(
-            self,
-            "DriftRule",
-            enabled=True,
-            description="Rule to start SM pipeline when drift has been detected.",
-            rule_name=drift_rule_name,
-            event_pattern=events.EventPattern(
-                source=["aws.cloudwatch"],
-                detail_type=["CloudWatch Alarm State Change"],
-                detail={
-                    "alarmName": [
-                        f"sagemaker-{project_name}-staging-threshold",
-                        f"sagemaker-{project_name}-prod-threshold",
-                        f"sagemaker-{project_name}-batch-staging-threshold",
-                        f"sagemaker-{project_name}-batch-prod-threshold",
-                    ],
-                    "state": {"value": ["ALARM"]},
-                },
-            ),
-        )
-
-        add_sagemaker_pipeline_target(
-            drift_rule,
-            event_role=event_role,
-            sagemaker_pipeline_arn=sagemaker_pipeline_arn,
-        )
 
         # Load the lambda pipeline change code
         with open("lambda/build/lambda_pipeline_change.py", encoding="utf8") as fp:
@@ -255,8 +229,6 @@ class BuildPipelineConstruct(Construct):
             },
         )
 
-        # Add permissions to put job status (if we want to call this directly within CodePipeline)
-        # see: https://docs.aws.amazon.com/codepipeline/latest/userguide/approvals-iam-permissions.html
         lambda_pipeline_change.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
@@ -282,7 +254,8 @@ class BuildPipelineConstruct(Construct):
             self,
             "SagemakerPipelineRule",
             rule_name=f"sagemaker-{project_name}-sagemakerpipeline-{construct_id}",
-            description="Rule to enable/disable SM pipeline triggers when a SageMaker Model Building Pipeline is in progress.",
+            description="Rule to enable/disable SM pipeline triggers when a "
+            "SageMaker Model Building Pipeline is in progress.",
             event_pattern=events.EventPattern(
                 source=["aws.sagemaker"],
                 detail_type=[

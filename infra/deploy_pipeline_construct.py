@@ -176,7 +176,8 @@ class DeployPipelineConstruct(Construct):
             self,
             "ModelRegistryRule",
             rule_name=f"sagemaker-{project_name}-modelregistry-{construct_id}",
-            description="Rule to trigger a deployment when SageMaker Model registry is updated with a new model package.",
+            description="Rule to trigger a deployment when SageMaker Model registry "
+            "is updated with a new model package.",
             event_pattern=events.EventPattern(
                 source=["aws.sagemaker"],
                 detail_type=["SageMaker Model Package State Change"],

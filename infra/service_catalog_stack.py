@@ -158,6 +158,43 @@ class ServiceCatalogStack(cdk.Stack):
                 resources=["*"],
             )
         )
+        cloudformation_role.add_to_principal_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "events:DescribeRule",
+                    "events:PutRule",
+                    "events:DeleteRule",
+                    "events:PutTargets",
+                    "events:RemoveTargets",
+                    "events:ListTargetsByRule",
+                    "events:ListRuleNamesByTarget",
+                ],
+                resources=[
+                    "*",
+                    self.format_arn(
+                        resource="rule", service="events", resource_name="sagemaker*"
+                    ),
+                ],
+            )
+        )
+
+        cloudformation_role.add_to_principal_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "iam:PassRole",
+                ],
+                resources=[
+                    "*",
+                    self.format_arn(
+                        resource="role",
+                        service="iam",
+                        resource_name="service-role/AmazonSageMakerServiceCatalogProductsEventsRole",
+                        region="",
+                        account="*",
+                    ),
+                ],
+            )
+        )
 
         # Add permissions to start SM pipelines to the Event Role
         event_role = sm_roles.events_role
