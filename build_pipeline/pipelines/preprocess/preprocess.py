@@ -6,11 +6,8 @@ import subprocess
 import sys
 from zipfile import ZipFile
 
-# Install geopandas dependency before including pandas
-subprocess.check_call([sys.executable, "-m", "pip", "install", "geopandas==0.9.0"])
-
-import pandas as pd  # noqa: E402
 import geopandas as gpd  # noqa: E402
+import pandas as pd  # noqa: E402
 from sklearn.model_selection import train_test_split  # noqa: E402
 
 logger = logging.getLogger()

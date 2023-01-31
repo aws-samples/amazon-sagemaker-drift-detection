@@ -1,5 +1,5 @@
 {
   "app": "python3 app.py",
-  "context": {
-  }
+  "context": {},
+  "versionReporting": false
 }

@@ -1,5 +1,8 @@
 {
     "stage_name": "staging",
     "instance_count": 1,
-    "instance_type": "ml.t2.medium"
+    "instance_type": "ml.t2.medium",
+    "variant_config": {
+        "variant_name": "DataDrift-Staging"
+    }
 }

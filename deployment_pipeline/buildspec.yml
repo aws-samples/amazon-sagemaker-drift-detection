@@ -5,7 +5,7 @@ phases:
       nodejs: '16'
       python: '3.9'
     commands:
-    - npm install aws-cdk@2.46.0
+    - npm install aws-cdk@2.62.2
     - npm update
     - python -m pip install -r requirements.txt
   build:
