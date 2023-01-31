@@ -7,7 +7,7 @@ from aws_cdk import aws_events as events
 from aws_cdk import aws_sagemaker as sagemaker
 from constructs import Construct
 
-from infra.endpoint_lineage import get_pipeline_arn
+from infra.sagemaker_lineage_utils import get_pipeline_arn_from_model
 from infra.sagemaker_pipelines_event_target import add_sagemaker_pipeline_target
 from infra.sagemaker_service_catalog_roles_construct import SageMakerSCRoles
 
@@ -196,10 +196,9 @@ class SageMakerStack(cdk.Stack):
 
             sm_roles = SageMakerSCRoles(self, "SmRoles", mutable=False)
             event_role = sm_roles.events_role
-            execution_role = sm_roles.execution_role
-            pipeline_arn = get_pipeline_arn(
-                endpoint_name=endpoint.attr_endpoint_name,
-                sagemaker_execution_role=execution_role.role_arn,
+
+            pipeline_arn = get_pipeline_arn_from_model(
+                model_package_arn=variant_config.model_package_arn
             )
             add_sagemaker_pipeline_target(
                 drift_rule,
@@ -229,7 +228,7 @@ class SageMakerStack(cdk.Stack):
                 policy_type="TargetTrackingScaling",
                 resource_id=resource_id,
                 scalable_dimension="sagemaker:variant:DesiredInstanceCount",
-                service_namespace="sagemaker",  # Note: This is different to scaling above
+                service_namespace="sagemaker",  # Note: different to scaling above
                 target_tracking_scaling_policy_configuration=applicationautoscaling.CfnScalingPolicy.TargetTrackingScalingPolicyConfigurationProperty(
                     target_value=deployment_config.auto_scaling.target_value,
                     scale_in_cooldown=deployment_config.auto_scaling.scale_in_cooldown,
