@@ -35,7 +35,7 @@ class BatchConfig:
         self.model_package_version = model_package_version
         self.model_package_arn = model_package_arn
         self.model_monitor_enabled = model_monitor_enabled
-        if type(drift_config) is dict:
+        if isinstance(drift_config, dict):
             self.drift_config = DriftConfig(**drift_config)
         else:
             self.drift_config = None

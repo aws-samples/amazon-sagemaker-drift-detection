@@ -70,13 +70,15 @@ class PipelineProductStack(sc.ProductStack):
         branch_name = "main"
 
         if build_pipeline:
-            # Require a schedule parameter (must be cron, otherwise will trigger every time rate is enabled/disabled)
+            # Require a schedule parameter (must be cron, otherwise will trigger every
+            # time rate is enabled/disabled)
             # https://docs.aws.amazon.com/AmazonCloudWatch/latest/events/ScheduledEvents.html
             retrain_schedule = cdk.CfnParameter(
                 self,
                 "RetrainSchedule",
                 type="String",
-                description="The expression to retrain schedule.  Defaults to first day of the month.",
+                description="The expression to retrain schedule.  Defaults to first "
+                "day of the month.",
                 default="cron(0 12 1 * ? *)",  # 1st of the month at 12am
                 min_length=1,
             )

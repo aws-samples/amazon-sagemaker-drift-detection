@@ -95,14 +95,14 @@ class ServiceCatalogStack(cdk.Stack):
         # Lambda powering the custom resource to convert names to lower case at
         # deploy time
         with open("lambda/lowercase_name.py", encoding="utf8") as fp:
-            lambda_start_pipeline_code = fp.read()
+            lambda_lowercase_code = fp.read()
 
         lowercase_lambda = lambda_.Function(
             self,
             "LowerCaseLambda",
             function_name="sagemaker-lowercase-names",
             description="Returns the lowercase version of a string",
-            code=lambda_.Code.from_inline(lambda_start_pipeline_code),
+            code=lambda_.Code.from_inline(lambda_lowercase_code),
             handler="index.lambda_handler",
             runtime=lambda_.Runtime.PYTHON_3_8,
             timeout=cdk.Duration.seconds(3),
@@ -156,6 +156,43 @@ class ServiceCatalogStack(cdk.Stack):
                     "cloudwatch:PutMetricAlarm",
                 ],
                 resources=["*"],
+            )
+        )
+        cloudformation_role.add_to_principal_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "events:DescribeRule",
+                    "events:PutRule",
+                    "events:DeleteRule",
+                    "events:PutTargets",
+                    "events:RemoveTargets",
+                    "events:ListTargetsByRule",
+                    "events:ListRuleNamesByTarget",
+                ],
+                resources=[
+                    "*",
+                    self.format_arn(
+                        resource="rule", service="events", resource_name="sagemaker*"
+                    ),
+                ],
+            )
+        )
+
+        cloudformation_role.add_to_principal_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "iam:PassRole",
+                ],
+                resources=[
+                    "*",
+                    self.format_arn(
+                        resource="role",
+                        service="iam",
+                        resource_name="service-role/AmazonSageMakerServiceCatalogProductsEventsRole",
+                        region="",
+                        account="*",
+                    ),
+                ],
             )
         )
 

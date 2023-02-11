@@ -8,6 +8,7 @@ from aws_cdk import aws_events_targets as targets
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_lambda as lambda_
 from aws_cdk import aws_s3 as s3
+from aws_cdk.aws_codebuild import BuildEnvironmentVariable
 from constructs import Construct
 
 from infra.sagemaker_pipelines_event_target import add_sagemaker_pipeline_target
@@ -99,23 +100,21 @@ class BuildPipelineConstruct(Construct):
             environment=codebuild.BuildEnvironment(
                 build_image=codebuild.LinuxBuildImage.AMAZON_LINUX_2_4,
                 environment_variables={
-                    "SAGEMAKER_PROJECT_NAME": codebuild.BuildEnvironmentVariable(
+                    "SAGEMAKER_PROJECT_NAME": BuildEnvironmentVariable(
                         value=project_name
                     ),
-                    "SAGEMAKER_PROJECT_ID": codebuild.BuildEnvironmentVariable(
-                        value=project_id
-                    ),
-                    "AWS_REGION": codebuild.BuildEnvironmentVariable(value=env.region),
-                    "SAGEMAKER_PIPELINE_NAME": codebuild.BuildEnvironmentVariable(
+                    "SAGEMAKER_PROJECT_ID": BuildEnvironmentVariable(value=project_id),
+                    "AWS_REGION": BuildEnvironmentVariable(value=env.region),
+                    "SAGEMAKER_PIPELINE_NAME": BuildEnvironmentVariable(
                         value=pipeline_name,
                     ),
-                    "SAGEMAKER_PIPELINE_DESCRIPTION": codebuild.BuildEnvironmentVariable(
+                    "SAGEMAKER_PIPELINE_DESCRIPTION": BuildEnvironmentVariable(
                         value=pipeline_description,
                     ),
-                    "SAGEMAKER_PIPELINE_ROLE_ARN": codebuild.BuildEnvironmentVariable(
+                    "SAGEMAKER_PIPELINE_ROLE_ARN": BuildEnvironmentVariable(
                         value=sagemaker_execution_role.role_arn,
                     ),
-                    "ARTIFACT_BUCKET": codebuild.BuildEnvironmentVariable(
+                    "ARTIFACT_BUCKET": BuildEnvironmentVariable(
                         value=s3_artifact.bucket_name
                     ),
                 },
@@ -133,22 +132,22 @@ class BuildPipelineConstruct(Construct):
             pipeline_name=code_pipeline_name,
         )
 
-        source_stage = code_pipeline.add_stage(
+        source_action = codepipeline_actions.CodeCommitSourceAction(
+            action_name="CodeCommit_Source",
+            repository=code,
+            # Created rule below to give it a custom name
+            trigger=codepipeline_actions.CodeCommitTrigger.NONE,
+            event_role=event_role,
+            output=source_output,
+            branch=branch_name,
+            role=code_pipeline_role,
+        )
+        _ = code_pipeline.add_stage(
             stage_name="Source",
-            actions=[
-                codepipeline_actions.CodeCommitSourceAction(
-                    action_name="CodeCommit_Source",
-                    repository=code,
-                    trigger=codepipeline_actions.CodeCommitTrigger.NONE,  # Created below
-                    event_role=event_role,
-                    output=source_output,
-                    branch=branch_name,
-                    role=code_pipeline_role,
-                )
-            ],
+            actions=[source_action],
         )
 
-        build_stage = code_pipeline.add_stage(
+        _ = code_pipeline.add_stage(
             stage_name="Build",
             actions=[
                 codepipeline_actions.CodeBuildAction(
@@ -160,6 +159,11 @@ class BuildPipelineConstruct(Construct):
                         pipeline_build_output,
                     ],
                     role=code_pipeline_role,
+                    environment_variables={
+                        "COMMIT_ID": BuildEnvironmentVariable(
+                            value=source_action.variables.commit_id,
+                        ),
+                    },
                 ),
             ],
         )
@@ -186,7 +190,8 @@ class BuildPipelineConstruct(Construct):
         deployment_success_rule = pipeline_deploy_stage.on_state_change(
             name="Start pipeline",
             rule_name=build_rule_name,
-            description="Rule to execute the Model Build pipeline once the pipeline has been deployed",
+            description="Rule to execute the Model Build pipeline once "
+            "the pipeline has been deployed",
             schedule=events.Schedule.expression(retrain_schedule),
             event_pattern=events.EventPattern(
                 source=["aws.codepipeline"],
@@ -205,33 +210,6 @@ class BuildPipelineConstruct(Construct):
             sagemaker_pipeline_arn=sagemaker_pipeline_arn,
         )
 
-        # Run the pipeline if data drift is detected
-        drift_rule = events.Rule(
-            self,
-            "DriftRule",
-            enabled=True,
-            description="Rule to start SM pipeline when drift has been detected.",
-            rule_name=drift_rule_name,
-            event_pattern=events.EventPattern(
-                source=["aws.cloudwatch"],
-                detail_type=["CloudWatch Alarm State Change"],
-                detail={
-                    "alarmName": [
-                        f"sagemaker-{project_name}-staging-threshold",
-                        f"sagemaker-{project_name}-prod-threshold",
-                        f"sagemaker-{project_name}-batch-staging-threshold",
-                        f"sagemaker-{project_name}-batch-prod-threshold",
-                    ],
-                    "state": {"value": ["ALARM"]},
-                },
-            ),
-        )
-
-        add_sagemaker_pipeline_target(
-            drift_rule,
-            event_role=event_role,
-            sagemaker_pipeline_arn=sagemaker_pipeline_arn,
-        )
 
         # Load the lambda pipeline change code
         with open("lambda/build/lambda_pipeline_change.py", encoding="utf8") as fp:
@@ -255,8 +233,6 @@ class BuildPipelineConstruct(Construct):
             },
         )
 
-        # Add permissions to put job status (if we want to call this directly within CodePipeline)
-        # see: https://docs.aws.amazon.com/codepipeline/latest/userguide/approvals-iam-permissions.html
         lambda_pipeline_change.add_to_role_policy(
             iam.PolicyStatement(
                 actions=[
@@ -282,7 +258,8 @@ class BuildPipelineConstruct(Construct):
             self,
             "SagemakerPipelineRule",
             rule_name=f"sagemaker-{project_name}-sagemakerpipeline-{construct_id}",
-            description="Rule to enable/disable SM pipeline triggers when a SageMaker Model Building Pipeline is in progress.",
+            description="Rule to enable/disable SM pipeline triggers when a "
+            "SageMaker Model Building Pipeline is in progress.",
             event_pattern=events.EventPattern(
                 source=["aws.sagemaker"],
                 detail_type=[
