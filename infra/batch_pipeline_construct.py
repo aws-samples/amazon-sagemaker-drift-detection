@@ -8,6 +8,7 @@ from aws_cdk import aws_events_targets as targets
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_lambda as lambda_
 from aws_cdk import aws_s3 as s3
+from aws_cdk.aws_codebuild import BuildEnvironmentVariable
 from constructs import Construct
 
 from infra.sagemaker_pipelines_event_target import add_sagemaker_pipeline_target
@@ -36,6 +37,7 @@ class BatchPipelineConstruct(Construct):
         seed_bucket: str,
         seed_key: str,
         batch_schedule: str,
+        lowercase_lambda: lambda_.Function = None,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -44,7 +46,7 @@ class BatchPipelineConstruct(Construct):
         repo = codecommit.CfnRepository(
             self,
             "CodeRepo",
-            repository_name="sagemaker-{}-{}".format(project_name, construct_id),
+            repository_name=f"sagemaker-{project_name}-{construct_id}",
             repository_description=f"Amazon SageMaker Drift {construct_id} pipeline",
             code=codecommit.CfnRepository.CodeProperty(
                 s3=codecommit.CfnRepository.S3Property(
@@ -67,9 +69,21 @@ class BatchPipelineConstruct(Construct):
 
         # Define resource names
         pipeline_name = f"{project_name}-{construct_id}"
+
+        # Use a custom resource to format the pipeline name
+        pipeline_name_lowercase = cdk.CustomResource(
+            self,
+            "CrPipelineNameLowercase",
+            service_token=lowercase_lambda.function_arn,
+            properties=dict(InputString=pipeline_name),
+        )
         pipeline_description = "SageMaker Drift Detection Batch Pipeline"
-        sagemaker_pipeline_arn = (
-            f"arn:aws:sagemaker:{env.region}:{env.account}:pipeline/{pipeline_name}"
+        sagemaker_pipeline_arn = cdk.Fn.join(
+            delimiter="/",
+            list_of_values=[
+                f"arn:aws:sagemaker:{env.region}:{env.account}:pipeline",
+                pipeline_name_lowercase.get_att_string("OutputString"),
+            ],
         )
         code_pipeline_name = f"sagemaker-{project_name}-{construct_id}"
         schedule_rule_name = f"sagemaker-{project_name}-schedule-{construct_id}"
@@ -79,28 +93,26 @@ class BatchPipelineConstruct(Construct):
         pipeline_build = codebuild.PipelineProject(
             self,
             "PipelineBuild",
-            project_name="sagemaker-{}-{}".format(project_name, construct_id),
+            project_name=f"sagemaker-{project_name}-{construct_id}",
             role=code_build_role,
             environment=codebuild.BuildEnvironment(
                 build_image=codebuild.LinuxBuildImage.AMAZON_LINUX_2_4,
                 environment_variables={
-                    "SAGEMAKER_PROJECT_NAME": codebuild.BuildEnvironmentVariable(
+                    "SAGEMAKER_PROJECT_NAME": BuildEnvironmentVariable(
                         value=project_name
                     ),
-                    "SAGEMAKER_PROJECT_ID": codebuild.BuildEnvironmentVariable(
-                        value=project_id
-                    ),
-                    "AWS_REGION": codebuild.BuildEnvironmentVariable(value=env.region),
-                    "SAGEMAKER_PIPELINE_NAME": codebuild.BuildEnvironmentVariable(
+                    "SAGEMAKER_PROJECT_ID": BuildEnvironmentVariable(value=project_id),
+                    "AWS_REGION": BuildEnvironmentVariable(value=env.region),
+                    "SAGEMAKER_PIPELINE_NAME": BuildEnvironmentVariable(
                         value=pipeline_name,
                     ),
-                    "SAGEMAKER_PIPELINE_DESCRIPTION": codebuild.BuildEnvironmentVariable(
+                    "SAGEMAKER_PIPELINE_DESCRIPTION": BuildEnvironmentVariable(
                         value=pipeline_description,
                     ),
-                    "SAGEMAKER_PIPELINE_ROLE_ARN": codebuild.BuildEnvironmentVariable(
+                    "SAGEMAKER_PIPELINE_ROLE_ARN": BuildEnvironmentVariable(
                         value=sagemaker_execution_role.role_arn,
                     ),
-                    "ARTIFACT_BUCKET": codebuild.BuildEnvironmentVariable(
+                    "ARTIFACT_BUCKET": BuildEnvironmentVariable(
                         value=s3_artifact.bucket_name
                     ),
                 },
@@ -116,75 +128,80 @@ class BatchPipelineConstruct(Construct):
             role=code_pipeline_role,
             artifact_bucket=s3_artifact,
             pipeline_name=code_pipeline_name,
-            stages=[
-                codepipeline.StageProps(
-                    stage_name="Source",
-                    actions=[
-                        codepipeline_actions.CodeCommitSourceAction(
-                            action_name="CodeCommit_Source",
-                            repository=code,
-                            trigger=codepipeline_actions.CodeCommitTrigger.NONE,  # Created below
-                            event_role=event_role,
-                            output=source_output,
-                            branch=branch_name,
-                            role=code_pipeline_role,
-                        )
+        )
+
+        source_action = codepipeline_actions.CodeCommitSourceAction(
+            action_name="CodeCommit_Source",
+            repository=code,
+            # Created rule below to give it a custom name
+            trigger=codepipeline_actions.CodeCommitTrigger.NONE,
+            event_role=event_role,
+            output=source_output,
+            branch=branch_name,
+            role=code_pipeline_role,
+        )
+        _ = code_pipeline.add_stage(
+            stage_name="Source",
+            actions=[source_action],
+        )
+
+        _ = code_pipeline.add_stage(
+            stage_name="Build",
+            actions=[
+                codepipeline_actions.CodeBuildAction(
+                    run_order=1,
+                    action_name="Build_Pipeline",
+                    project=pipeline_build,
+                    input=source_output,
+                    outputs=[
+                        pipeline_build_output,
                     ],
+                    role=code_pipeline_role,
+                    environment_variables={
+                        "COMMIT_ID": BuildEnvironmentVariable(
+                            value=source_action.variables.commit_id,
+                        ),
+                    },
                 ),
-                codepipeline.StageProps(
-                    stage_name="Build",
-                    actions=[
-                        codepipeline_actions.CodeBuildAction(
-                            run_order=1,
-                            action_name="Build_Pipeline",
-                            project=pipeline_build,
-                            input=source_output,
-                            outputs=[
-                                pipeline_build_output,
-                            ],
-                            role=code_pipeline_role,
-                        ),
-                    ],
+            ],
+        )
+        _ = code_pipeline.add_stage(
+            stage_name="BatchStaging",
+            actions=[
+                codepipeline_actions.CloudFormationCreateUpdateStackAction(
+                    action_name="Batch_CFN_Staging",
+                    run_order=1,
+                    template_path=pipeline_build_output.at_path(
+                        "drift-batch-staging.template.json"
+                    ),
+                    stack_name=f"sagemaker-{project_name}-batch-staging",
+                    admin_permissions=False,
+                    deployment_role=cloudformation_role,
+                    replace_on_failure=True,
+                    role=code_pipeline_role,
                 ),
-                codepipeline.StageProps(
-                    stage_name="BatchStaging",
-                    actions=[
-                        codepipeline_actions.CloudFormationCreateUpdateStackAction(
-                            action_name="Batch_CFN_Staging",
-                            run_order=1,
-                            template_path=pipeline_build_output.at_path(
-                                "drift-batch-staging.template.json"
-                            ),
-                            stack_name=f"sagemaker-{project_name}-batch-staging",
-                            admin_permissions=False,
-                            deployment_role=cloudformation_role,
-                            replace_on_failure=True,
-                            role=code_pipeline_role,
-                        ),
-                        codepipeline_actions.ManualApprovalAction(
-                            action_name="Approve_Staging",
-                            run_order=2,
-                            additional_information="Approving deployment for production",
-                            role=code_pipeline_role,
-                        ),
-                    ],
+                codepipeline_actions.ManualApprovalAction(
+                    action_name="Approve_Staging",
+                    run_order=2,
+                    additional_information="Approving deployment for production",
+                    role=code_pipeline_role,
                 ),
-                codepipeline.StageProps(
-                    stage_name="BatchProd",
-                    actions=[
-                        codepipeline_actions.CloudFormationCreateUpdateStackAction(
-                            action_name="Batch_CFN_Prod",
-                            run_order=1,
-                            template_path=pipeline_build_output.at_path(
-                                "drift-batch-prod.template.json"
-                            ),
-                            stack_name=f"sagemaker-{project_name}-batch-prod",
-                            admin_permissions=False,
-                            deployment_role=cloudformation_role,
-                            role=code_pipeline_role,
-                            replace_on_failure=True,
-                        ),
-                    ],
+            ],
+        )
+        _ = code_pipeline.add_stage(
+            stage_name="BatchProd",
+            actions=[
+                codepipeline_actions.CloudFormationCreateUpdateStackAction(
+                    action_name="Batch_CFN_Prod",
+                    run_order=1,
+                    template_path=pipeline_build_output.at_path(
+                        "drift-batch-prod.template.json"
+                    ),
+                    stack_name=f"sagemaker-{project_name}-batch-prod",
+                    admin_permissions=False,
+                    deployment_role=cloudformation_role,
+                    role=code_pipeline_role,
+                    replace_on_failure=True,
                 ),
             ],
         )
@@ -226,7 +243,8 @@ class BatchPipelineConstruct(Construct):
             },
         )
 
-        # Add permissions to put job status (if we want to call this directly within CodePipeline)
+        # Add permissions to put job status (if we want to call this directly
+        # within CodePipeline)
         # see: https://docs.aws.amazon.com/codepipeline/latest/userguide/approvals-iam-permissions.html
         lambda_pipeline_change.add_to_role_policy(
             iam.PolicyStatement(
@@ -253,7 +271,8 @@ class BatchPipelineConstruct(Construct):
             self,
             "SagemakerPipelineRule",
             rule_name=f"sagemaker-{project_name}-sagemakerpipeline-{construct_id}",
-            description="Rule to enable/disable SM pipeline triggers when a SageMaker Batch Pipeline is in progress.",
+            description="Rule to enable/disable SM pipeline triggers when a "
+            "SageMaker Batch Pipeline is in progress.",
             event_pattern=events.EventPattern(
                 source=["aws.sagemaker"],
                 detail_type=[
@@ -279,7 +298,8 @@ class BatchPipelineConstruct(Construct):
             rule_name="sagemaker-{}-modelregistry-{}".format(
                 project_name, construct_id
             ),
-            description="Rule to trigger a deployment when SageMaker Model registry is updated with a new model package.",
+            description="Rule to trigger a deployment when SageMaker Model "
+            "Registry is updated with a new model package.",
             event_pattern=events.EventPattern(
                 source=["aws.sagemaker"],
                 detail_type=["SageMaker Model Package State Change"],

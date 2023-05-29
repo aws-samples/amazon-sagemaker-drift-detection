@@ -2,13 +2,11 @@
 import glob
 import logging
 import os
-import subprocess
-import sys
 from zipfile import ZipFile
 
-import geopandas as gpd  # noqa: E402
-import pandas as pd  # noqa: E402
-from sklearn.model_selection import train_test_split  # noqa: E402
+import geopandas as gpd
+import pandas as pd  
+from sklearn.model_selection import train_test_split
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -27,7 +25,7 @@ def load_zones(zones_dir: str):
     zone_df = gpd.read_file(os.path.join(zones_dir, "taxi_zones.shp"))
     # Get centroids as EPSG code of 3310 to measure distance
     zone_df["centroid"] = zone_df.geometry.centroid.to_crs(epsg=3310)
-    # Convert cordinates to the WSG84 lat/long CRS has a EPSG code of 4326.
+    # Convert coordinates to the WSG84 lat/long CRS has a EPSG code of 4326.
     zone_df["latitude"] = zone_df.centroid.to_crs(epsg=4326).x
     zone_df["longitude"] = zone_df.centroid.to_crs(epsg=4326).y
     return zone_df

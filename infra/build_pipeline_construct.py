@@ -90,6 +90,32 @@ class BuildPipelineConstruct(Construct):
         drift_rule_name = f"sagemaker-{project_name}-drift-{construct_id}"
         schedule_rule_name = f"sagemaker-{project_name}-schedule-{construct_id}"
 
+        source_output = codepipeline.Artifact()
+        pipeline_build_output = codepipeline.Artifact()
+
+        code_pipeline = codepipeline.Pipeline(
+            self,
+            "Pipeline",
+            role=code_pipeline_role,
+            artifact_bucket=s3_artifact,
+            pipeline_name=code_pipeline_name,
+        )
+
+        source_action = codepipeline_actions.CodeCommitSourceAction(
+            action_name="CodeCommit_Source",
+            repository=code,
+            # Created rule below to give it a custom name
+            trigger=codepipeline_actions.CodeCommitTrigger.NONE,
+            event_role=event_role,
+            output=source_output,
+            branch=branch_name,
+            role=code_pipeline_role,
+        )
+        _ = code_pipeline.add_stage(
+            stage_name="Source",
+            actions=[source_action],
+        )
+
         # Define AWS CodeBuild spec to run node.js and python
         # https://docs.aws.amazon.com/codebuild/latest/userguide/available-runtimes.html
         pipeline_build = codebuild.PipelineProject(
@@ -121,32 +147,6 @@ class BuildPipelineConstruct(Construct):
             ),
         )
 
-        source_output = codepipeline.Artifact()
-        pipeline_build_output = codepipeline.Artifact()
-
-        code_pipeline = codepipeline.Pipeline(
-            self,
-            "Pipeline",
-            role=code_pipeline_role,
-            artifact_bucket=s3_artifact,
-            pipeline_name=code_pipeline_name,
-        )
-
-        source_action = codepipeline_actions.CodeCommitSourceAction(
-            action_name="CodeCommit_Source",
-            repository=code,
-            # Created rule below to give it a custom name
-            trigger=codepipeline_actions.CodeCommitTrigger.NONE,
-            event_role=event_role,
-            output=source_output,
-            branch=branch_name,
-            role=code_pipeline_role,
-        )
-        _ = code_pipeline.add_stage(
-            stage_name="Source",
-            actions=[source_action],
-        )
-
         _ = code_pipeline.add_stage(
             stage_name="Build",
             actions=[
@@ -162,6 +162,9 @@ class BuildPipelineConstruct(Construct):
                     environment_variables={
                         "COMMIT_ID": BuildEnvironmentVariable(
                             value=source_action.variables.commit_id,
+                        ),
+                        "REPOSITORY_NAME": BuildEnvironmentVariable(
+                            value=source_action.variables.repository_name
                         ),
                     },
                 ),
@@ -209,7 +212,6 @@ class BuildPipelineConstruct(Construct):
             event_role=event_role,
             sagemaker_pipeline_arn=sagemaker_pipeline_arn,
         )
-
 
         # Load the lambda pipeline change code
         with open("lambda/build/lambda_pipeline_change.py", encoding="utf8") as fp:

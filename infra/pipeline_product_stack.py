@@ -128,6 +128,7 @@ class PipelineProductStack(sc.ProductStack):
                 seed_bucket=seed_bucket.bucket_name,
                 seed_key="batch_pipeline.zip",
                 batch_schedule=batch_schedule.value_as_string,
+                lowercase_lambda=lowercase_lambda
             )
 
         if deploy_pipeline:

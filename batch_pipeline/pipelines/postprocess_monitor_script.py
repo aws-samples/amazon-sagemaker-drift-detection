@@ -1,22 +1,24 @@
-import os
 import json
+import logging
+import os
 import re
 import subprocess
 import sys
-import logging
 from datetime import datetime
+
 
 def install(package):
     subprocess.check_call([sys.executable, "-m", "pip", "install", package])
 
-install('boto3')
-import boto3
+
+install("boto3")
+import boto3  # noqa: E402
 
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 logger = logging.getLogger()
 logger.setLevel(LOG_LEVEL)
-region = os.environ.get('Region', 'NoAWSRegionFound')
-pipeline_name = os.environ.get('PipelineName', 'NoPipelineNameFound')
+region = os.environ.get("AWS_REGION", "NoAWSRegionFound")
+pipeline_name = os.environ.get("PipelineName", "NoPipelineNameFound")
 
 cloudwatch = boto3.client("cloudwatch", region)
 
@@ -34,7 +36,7 @@ def get_baseline_drift(feature):
                         "metric_threshold": float(matches.group(2)),
                     }
 
-                    
+
 def put_cloudwatch_metric(pipeline_name: str, metrics: list):
     for m in metrics:
         logger.info(f'Putting metric: {m["metric_name"]} value: {m["metric_value"]}')
@@ -52,15 +54,15 @@ def put_cloudwatch_metric(pipeline_name: str, metrics: list):
         )
         logger.debug(response)
 
-        
+
 def postprocess_handler():
     violations_file = "/opt/ml/processing/output/constraint_violations.json"
     if os.path.isfile(violations_file):
         f = open(violations_file)
         violations = json.load(f)
         metrics = list(get_baseline_drift(violations))
-        
+
         put_cloudwatch_metric(pipeline_name, metrics)
         logger.info("Violation detected and added to cloudwatch")
-    else: 
+    else:
         logger.info("No constraint_violations file found. All good!")

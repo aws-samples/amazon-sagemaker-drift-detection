@@ -4,7 +4,6 @@ import logging
 
 import aws_cdk as cdk
 
-from infra.pipeline_product_stack import BatchPipelineStack, DeployPipelineStack
 from infra.service_catalog_stack import ServiceCatalogStack
 
 # Configure the logger
