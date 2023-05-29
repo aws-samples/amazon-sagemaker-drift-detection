@@ -16,6 +16,7 @@ from sagemaker.debugger import Rule, rule_configs
 from sagemaker.drift_check_baselines import DriftCheckBaselines
 from sagemaker.estimator import Estimator
 from sagemaker.inputs import TrainingInput
+from sagemaker.metadata_properties import MetadataProperties
 from sagemaker.model import Model
 from sagemaker.model_metrics import MetricsSource, ModelMetrics
 from sagemaker.model_monitor.dataset_format import DatasetFormat
@@ -95,11 +96,11 @@ def get_pipeline(
     )
     input_data = ParameterString(
         name="InputDataUrl",
-        default_value=f"s3://{default_bucket}/inputs/data",
+        default_value=f"s3://{default_bucket}/input/data",
     )
     input_zones = ParameterString(
         name="InputZonesUrl",
-        default_value=f"s3://{default_bucket}/inputs/zones/taxi_zones.zip",
+        default_value=f"s3://{default_bucket}/input/zones/taxi_zones.zip",
     )
     processing_instance_count = ParameterInteger(
         name="ProcessingInstanceCount",
@@ -185,11 +186,19 @@ def get_pipeline(
                 values=output_common_path + ["baseline"],
             ),
         ),
+        ProcessingOutput(
+            output_name="sample_payload",
+            source="/opt/ml/processing/sample_payload",
+            destination=Join(
+                on="/",
+                values=output_common_path + ["sample_payload"],
+            ),
+        ),
     ]
 
     sklearn_processor = FrameworkProcessor(
         estimator_cls=SKLearn,
-        framework_version="0.23-1",
+        framework_version="1.2-1",
         role=role,
         instance_type=processing_instance_type,
         instance_count=processing_instance_count,
@@ -203,7 +212,6 @@ def get_pipeline(
             outputs=outputs,
             code="preprocess.py",
             source_dir=os.path.join(BASE_DIR, "preprocess"),
-            job_name=f"scripts/{commit_id[:8]}/preprocess",
         ),
         cache_config=cache_config,
     )
@@ -244,10 +252,12 @@ def get_pipeline(
     rules = [Rule.sagemaker(rule_configs.create_xgboost_report())]
 
     # training step for generating model artifacts
+    framework = "xgboost"
+    framework_version = "1.2-2"
     image_uri = sagemaker.image_uris.retrieve(
-        framework="xgboost",
+        framework=framework,
         region=region,
-        version="1.2-2",
+        version=framework_version,
     )
     xgb_train = Estimator(
         image_uri=image_uri,
@@ -279,7 +289,6 @@ def get_pipeline(
     step_train = TrainingStep(
         name="TrainModel",
         step_args=xgb_train.fit(
-            job_name=f"scripts/{commit_id[:8]}/train",
             inputs={
                 "train": TrainingInput(
                     s3_data=step_process.properties.ProcessingOutputConfig.Outputs[
@@ -395,6 +404,24 @@ def get_pipeline(
             approval_status=model_approval_status,
             model_metrics=model_metrics,
             drift_check_baselines=drift_check_baselines,
+            domain="MACHINE_LEARNING",
+            task="REGRESSION",
+            framework=framework.upper(),
+            framework_version=framework_version,
+            sample_payload_url=Join(
+                on="/",
+                values=[
+                    step_process.properties.ProcessingOutputConfig.Outputs[
+                        "sample_payload"
+                    ].S3Output.S3Uri,
+                    "payload.tar.gz",
+                ],
+            ),
+            metadata_properties=MetadataProperties(
+                commit_id=os.getenv("COMMIT_ID"),
+                repository=os.getenv("REPOSITORY_NAME"),
+                project_id=os.getenv("SAGEMAKER_PROJECT_ID"),
+            ),
         ),
     )
 

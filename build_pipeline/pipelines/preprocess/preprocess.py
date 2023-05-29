@@ -5,7 +5,7 @@ import os
 from zipfile import ZipFile
 
 import geopandas as gpd
-import pandas as pd  
+import pandas as pd
 from sklearn.model_selection import train_test_split
 
 logger = logging.getLogger()
@@ -125,8 +125,16 @@ def save_files(base_dir: str, data_df: pd.DataFrame, val_size=0.2, test_size=0.0
 
     # Save training data as baseline with header
     train_df.to_csv(f"{base_dir}/baseline/baseline.csv", header=True, index=False)
-    return train_df, val_df, test_df
 
+    # Save sample payload
+    train_df.sample(20).drop(columns=["fare_amount"]).to_csv(
+        f"{base_dir}/sample_payload/payload.tar.gz",
+        index=False,
+        header=False,
+        compression={'method': 'tar', "archive_name": "payload.csv"}
+    )
+
+    return train_df, val_df, test_df
 
 def main(base_dir):
     # Input data files
