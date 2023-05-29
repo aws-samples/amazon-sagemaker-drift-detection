@@ -11,6 +11,7 @@ python = "^3.9"
 aws-cdk-lib = "^2.50.0"
 constructs = "^10.1.153"
 boto3 = "^1.26.4"
+sagemaker = "^2.154.0"
 
 
 [tool.poetry.group.dev.dependencies]
