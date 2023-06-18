@@ -25,29 +25,6 @@ class SageMakerPipelineStack(cdk.Stack):
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        # definition_bucket = cdk.CfnParameter(
-        #     self,
-        #     "PipelineDefinitionBucket",
-        #     type="String",
-        #     description="The s3 bucket for pipeline definition",
-        #     min_length=1,
-        # )
-        # definition_key = cdk.CfnParameter(
-        #     self,
-        #     "PipelineDefinitionKey",
-        #     type="String",
-        #     description="The s3 key for pipeline definition",
-        #     min_length=1,
-        # )
-
-        sagemaker.CfnModelPackageGroup(
-            self,
-            "ModelPackageGroup",
-            model_package_group_name=model_package_group_name,
-            model_package_group_description=pipeline_description,
-            tags=tags,
-        )
-
         sagemaker.CfnPipeline(
             self,
             "Pipeline",

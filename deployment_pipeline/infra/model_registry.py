@@ -165,7 +165,10 @@ class ModelRegistry:
 
             # Return error if no packages found
             if len(model_packages) == 0:
-                error_message = f"No approved packages found for: {model_package_group_name} and versions: {model_package_versions}"
+                error_message = (
+                    f"No approved packages found for: {model_package_group_name} "
+                    f"and versions: {model_package_versions}"
+                )
                 logger.error(error_message)
                 raise Exception(error_message)
 
@@ -200,30 +203,17 @@ class ModelRegistry:
             ]
         return filtered_packages
 
-    def get_pipeline_execution_arn(self, model_package_arn: str):
-        """Get the execution arn for the latest approved model package
-
-        Args:
-            model_package_arn: The arn of the model package
-
-        Returns:
-            The arn of the sagemaker pipeline that created the model package.
-        """
-
-        artifact_arn = self.sm_client.list_artifacts(SourceUri=model_package_arn)[
-            "ArtifactSummaries"
-        ][0]["ArtifactArn"]
-        return self.sm_client.describe_artifact(ArtifactArn=artifact_arn)[
-            "MetadataProperties"
-        ]["GeneratedBy"]
-
-
     def get_data_check_baseline_uri(self, model_package_arn: str):
         try:
-            model_details = self.sm_client.describe_model_package(ModelPackageName=model_package_arn)
-            print(model_details)
-            baseline_uri = model_details['DriftCheckBaselines']['ModelDataQuality']['Constraints']['S3Uri']
-            baseline_uri = baseline_uri.replace('/constraints.json','') # returning the folder containing constraints and statistics
+            model_details = self.sm_client.describe_model_package(
+                ModelPackageName=model_package_arn
+            )
+            logger.info(model_details)
+            baseline_uri = model_details["DriftCheckBaselines"]["ModelDataQuality"][
+                "Constraints"
+            ]["S3Uri"]
+            # returning the folder containing constraints and statistics
+            baseline_uri = baseline_uri.replace("/constraints.json", "")
             return baseline_uri
         except ClientError as e:
             error_message = e.response["Error"]["Message"]

@@ -21,6 +21,7 @@ def main(
     sagemaker_pipeline_description,
     sagemaker_pipeline_role,
     artifact_bucket,
+    commit_id=None,
 ):
     # Use project_name for pipeline and model package group name
     model_package_group_name = project_name
@@ -30,7 +31,7 @@ def main(
         default_bucket=artifact_bucket,
         model_package_group_name=model_package_group_name,
         pipeline_name=sagemaker_pipeline_name,
-        base_job_prefix=project_id,
+        commit_id=commit_id,
     )
 
     # Create the pipeline definition
@@ -90,6 +91,10 @@ if __name__ == "__main__":
     parser.add_argument(
         "--artifact-bucket",
         default=os.environ.get("ARTIFACT_BUCKET"),
+    )
+    parser.add_argument(
+        "--commit-id",
+        default=os.environ.get("COMMIT_ID"),
     )
     args = vars(parser.parse_args())
     logger.info("args: {}".format(args))

@@ -7,7 +7,7 @@ class InstanceConfig:
 class VariantConfig(InstanceConfig):
     def __init__(
         self,
-        model_package_version: str,
+        model_package_version: str = None,
         initial_variant_weight: float = 1.0,
         variant_name: str = None,
         instance_count: int = 1,
@@ -72,7 +72,7 @@ class DeploymentConfig(InstanceConfig):
         schedule_config: ScheduleConfig = None,
     ):
         self.stage_name = stage_name
-        if type(variant_config) is dict:
+        if isinstance(variant_config, dict):
             self.variant_config = VariantConfig(
                 **{
                     "instance_count": instance_count,
@@ -82,11 +82,11 @@ class DeploymentConfig(InstanceConfig):
             )
         else:
             self.variant_config = None
-        if type(auto_scaling) is dict:
+        if isinstance(auto_scaling, dict):
             self.auto_scaling = AutoScalingConfig(**auto_scaling)
         else:
             self.auto_scaling = None
-        if type(schedule_config) is dict:
+        if isinstance(schedule_config, dict):
             self.schedule_config = ScheduleConfig(**schedule_config)
         else:
             self.schedule_config = None

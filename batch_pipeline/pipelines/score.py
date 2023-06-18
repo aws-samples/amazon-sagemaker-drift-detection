@@ -1,10 +1,9 @@
 """Evaluation script for measuring mean squared error."""
+import glob
 import logging
 import pathlib
-import glob
 import pickle
 import tarfile
-from math import sqrt
 
 import pandas as pd
 import xgboost

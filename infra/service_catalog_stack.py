@@ -2,7 +2,6 @@ from pathlib import Path
 from zipfile import ZipFile
 
 import aws_cdk as cdk
-
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_lambda as lambda_
 from aws_cdk import aws_s3 as s3
@@ -48,7 +47,7 @@ class ServiceCatalogStack(cdk.Stack):
             "PortfolioOwner",
             type="String",
             description="The owner of the portfolio",
-            default="administrator",
+            default="MLOps Admin",
             min_length=1,
             max_length=50,
         )
@@ -72,7 +71,7 @@ class ServiceCatalogStack(cdk.Stack):
             seed_bucket = s3.Bucket(
                 self,
                 "SeedBucket",
-                bucket_name=f"sagemaker-drift-detection-template-seed-{self.account}",
+                bucket_name=f"sagemaker-drift-detection-seed-{self.region}-{self.account}",
                 removal_policy=cdk.RemovalPolicy.DESTROY,
                 auto_delete_objects=True,
             )
@@ -95,14 +94,14 @@ class ServiceCatalogStack(cdk.Stack):
         # Lambda powering the custom resource to convert names to lower case at
         # deploy time
         with open("lambda/lowercase_name.py", encoding="utf8") as fp:
-            lambda_start_pipeline_code = fp.read()
+            lambda_lowercase_code = fp.read()
 
         lowercase_lambda = lambda_.Function(
             self,
             "LowerCaseLambda",
             function_name="sagemaker-lowercase-names",
             description="Returns the lowercase version of a string",
-            code=lambda_.Code.from_inline(lambda_start_pipeline_code),
+            code=lambda_.Code.from_inline(lambda_lowercase_code),
             handler="index.lambda_handler",
             runtime=lambda_.Runtime.PYTHON_3_8,
             timeout=cdk.Duration.seconds(3),
@@ -138,6 +137,53 @@ class ServiceCatalogStack(cdk.Stack):
         )
 
         sm_roles = SageMakerSCRoles(self, "SageMakerSCRoles", mutable=True)
+
+        code_build_role = sm_roles.code_build_role
+        code_build_role.add_to_principal_policy(
+            iam.PolicyStatement(
+                actions=["sagemaker:DescribeTrainingJob"],
+                resources=[
+                    self.format_arn(
+                        resource="training-job",
+                        service="sagemaker",
+                        resource_name="*",
+                    ),
+                ],
+            )
+        )
+
+        code_build_role.add_to_principal_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "sagemaker:QueryLineage",
+                    "sagemaker:ListArtifacts",
+                    "sagemaker:ListTags",
+                ],
+                resources=["*"],
+            )
+        )
+
+        code_build_role.add_to_principal_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "sagemaker:DescribeArtifact",
+                    "sagemaker:DescribeTrialComponent",
+                ],
+                resources=[
+                    self.format_arn(
+                        resource="artifact",
+                        service="sagemaker",
+                        resource_name="*",
+                    ),
+                    self.format_arn(
+                        resource="experiment-trial-component",
+                        service="sagemaker",
+                        resource_name="*",
+                    ),
+                ],
+            )
+        )
+
         # Add endpoint autoscaling policies to CloudFormation role
         cloudformation_role = sm_roles.cloudformation_role
         cloudformation_role.add_to_principal_policy(
@@ -156,6 +202,55 @@ class ServiceCatalogStack(cdk.Stack):
                     "cloudwatch:PutMetricAlarm",
                 ],
                 resources=["*"],
+            )
+        )
+        cloudformation_role.add_to_principal_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "events:DescribeRule",
+                    "events:PutRule",
+                    "events:DeleteRule",
+                    "events:PutTargets",
+                    "events:RemoveTargets",
+                    "events:ListTargetsByRule",
+                    "events:ListRuleNamesByTarget",
+                ],
+                resources=[
+                    "*",
+                    self.format_arn(
+                        resource="rule", service="events", resource_name="sagemaker*"
+                    ),
+                ],
+            )
+        )
+        cloudformation_role.add_to_principal_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "ssm:GetParameters",
+                ],
+                resources=[
+                    "*",
+                    self.format_arn(
+                        resource="parameter", service="ssm", resource_name="sagemaker*"
+                    ),
+                ],
+            )
+        )
+        cloudformation_role.add_to_principal_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "iam:PassRole",
+                ],
+                resources=[
+                    "*",
+                    self.format_arn(
+                        resource="role",
+                        service="iam",
+                        resource_name="service-role/AmazonSageMakerServiceCatalogProductsEventsRole",
+                        region="",
+                        account="*",
+                    ),
+                ],
             )
         )
 
@@ -219,7 +314,7 @@ class ServiceCatalogStack(cdk.Stack):
                 "drift:cloudformation_role"
             )
         ) is not None:
-            product_roles.code_build_role = iam.Role.from_role_arn(
+            product_roles.cloudformation_role = iam.Role.from_role_arn(
                 self,
                 "code_build_role",
                 role_arn=cloudformation_role_arn,

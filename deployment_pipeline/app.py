@@ -27,7 +27,7 @@ def create_endpoint(
 ):
 
     # Define variables for passing down to stacks
-    endpoint_name = f"sagemaker-{project_name}-{stage_name}"
+    endpoint_name = f"{project_name}-{stage_name}"
     if len(endpoint_name) > 63:
         raise Exception(
             f"SageMaker endpoint: {endpoint_name} must be less than 64 characters"
@@ -50,7 +50,7 @@ def create_endpoint(
     package_group_name = project_name
 
     # If we don't have a specific champion variant defined, get the latest approved
-    if deployment_config.variant_config is None:
+    if deployment_config.variant_config.model_package_version is None:
         logger.info("Selecting latest approved")
         p = registry.get_latest_approved_packages(package_group_name, max_results=1)[0]
         deployment_config.variant_config = VariantConfig(
@@ -59,6 +59,8 @@ def create_endpoint(
             initial_variant_weight=1,
             instance_count=deployment_config.instance_count,
             instance_type=deployment_config.instance_type,
+            variant_name=deployment_config.variant_config.variant_name
+            or f"{package_group_name}-LatestApproved",
         )
     else:
         # Get the versioned package and update ARN
@@ -73,10 +75,10 @@ def create_endpoint(
     baseline_uri = registry.get_data_check_baseline_uri(p["ModelPackageArn"])
     logger.info(f"Got baseline uri: {baseline_uri}")
 
-    data_capture_uri = f"s3://{artifact_bucket}/{project_id}/datacapture"
+    data_capture_uri = f"s3://{artifact_bucket}/monitoring/datacapture"
     logger.info(f"Got data capture uri: {data_capture_uri}")
 
-    reporting_uri = f"s3://{artifact_bucket}/{project_id}/monitoring"
+    reporting_uri = f"s3://{artifact_bucket}/monitoring/reports"
     logger.info(f"Got reporting uri: {reporting_uri}")
 
     stack_synthesizer = cdk.DefaultStackSynthesizer(
@@ -146,5 +148,5 @@ if __name__ == "__main__":
         default=os.environ.get("ARTIFACT_BUCKET"),
     )
     args = vars(parser.parse_args())
-    print("args: {}".format(args))
+    logger.info("args: {}".format(args))
     main(**args)

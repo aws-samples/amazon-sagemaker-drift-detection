@@ -12,5 +12,8 @@
         "metric_name": "feature_baseline_drift_fare_amount",
         "metric_threshold": 0.4,
         "period": 3600
+    },
+    "variant_config": {
+        "variant_name": "DataDrift-Prod"
     }
 }

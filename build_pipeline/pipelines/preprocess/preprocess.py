@@ -2,16 +2,11 @@
 import glob
 import logging
 import os
-import subprocess
-import sys
 from zipfile import ZipFile
 
-# Install geopandas dependency before including pandas
-subprocess.check_call([sys.executable, "-m", "pip", "install", "geopandas==0.9.0"])
-
-import pandas as pd  # noqa: E402
-import geopandas as gpd  # noqa: E402
-from sklearn.model_selection import train_test_split  # noqa: E402
+import geopandas as gpd
+import pandas as pd
+from sklearn.model_selection import train_test_split
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -30,7 +25,7 @@ def load_zones(zones_dir: str):
     zone_df = gpd.read_file(os.path.join(zones_dir, "taxi_zones.shp"))
     # Get centroids as EPSG code of 3310 to measure distance
     zone_df["centroid"] = zone_df.geometry.centroid.to_crs(epsg=3310)
-    # Convert cordinates to the WSG84 lat/long CRS has a EPSG code of 4326.
+    # Convert coordinates to the WSG84 lat/long CRS has a EPSG code of 4326.
     zone_df["latitude"] = zone_df.centroid.to_crs(epsg=4326).x
     zone_df["longitude"] = zone_df.centroid.to_crs(epsg=4326).y
     return zone_df
@@ -130,8 +125,16 @@ def save_files(base_dir: str, data_df: pd.DataFrame, val_size=0.2, test_size=0.0
 
     # Save training data as baseline with header
     train_df.to_csv(f"{base_dir}/baseline/baseline.csv", header=True, index=False)
-    return train_df, val_df, test_df
 
+    # Save sample payload
+    train_df.sample(20).drop(columns=["fare_amount"]).to_csv(
+        f"{base_dir}/sample_payload/payload.tar.gz",
+        index=False,
+        header=False,
+        compression={'method': 'tar', "archive_name": "payload.csv"}
+    )
+
+    return train_df, val_df, test_df
 
 def main(base_dir):
     # Input data files

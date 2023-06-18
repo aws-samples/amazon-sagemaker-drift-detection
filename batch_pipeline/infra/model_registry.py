@@ -33,7 +33,7 @@ class ModelRegistry:
                 ModelPackageGroupDescription=description,
             )
             model_package_group_arn = response["ModelPackageGroupArn"]
-            # Add tags seperately
+            # Add tags separately
             self.sm_client.add_tags(
                 ResourceArn=model_package_group_arn,
                 Tags=[
@@ -84,7 +84,7 @@ class ModelRegistry:
                 "SortBy": "CreationTime",
                 "MaxResults": max_results,
             }
-            # Add optional creationg time after
+            # Add optional creation time after
             if creation_time_after is not None:
                 args = {**args, "CreationTimeAfter": creation_time_after}
             response = self.sm_client.list_model_packages(**args)
@@ -165,7 +165,10 @@ class ModelRegistry:
 
             # Return error if no packages found
             if len(model_packages) == 0:
-                error_message = f"No approved packages found for: {model_package_group_name} and versions: {model_package_versions}"
+                error_message = (
+                    "No approved packages found for: "
+                    f"{model_package_group_name} and versions: {model_package_versions}"
+                )
                 logger.error(error_message)
                 raise Exception(error_message)
 
@@ -182,7 +185,7 @@ class ModelRegistry:
     def select_versioned_packages(
         self, model_packages: list, model_package_versions: list
     ):
-        """Filters the model packages based on a list of model package verisons.
+        """Filters the model packages based on a list of model package versions.
 
         Args:
             model_packages: The list of packages.
@@ -199,61 +202,3 @@ class ModelRegistry:
                 p for p in model_packages if p["ModelPackageVersion"] == version
             ]
         return filtered_packages
-
-    def get_pipeline_execution_arn(self, model_package_arn: str):
-        """Geturns the execution arn for the latest approved model package
-
-        Args:
-            model_package_arn: The arn of the model package
-
-        Returns:
-            The arn of the sagemaker pipeline that created the model package.
-        """
-
-        artifact_arn = self.sm_client.list_artifacts(SourceUri=model_package_arn)[
-            "ArtifactSummaries"
-        ][0]["ArtifactArn"]
-        return self.sm_client.describe_artifact(ArtifactArn=artifact_arn)[
-            "MetadataProperties"
-        ]["GeneratedBy"]
-
-    def get_model_artifact(
-        self,
-        pipeline_execution_arn: str,
-        step_name: str = "TrainModel",
-    ):
-        """Returns the training job model artifact uri for a given step name.
-
-        Args:
-            pipeline_execution_arn: The pipeline execution arn
-            step_name: The optional training job step name
-
-        Returns:
-            The model artifact from the training job
-        """
-
-        steps = self.sm_client.list_pipeline_execution_steps(
-            PipelineExecutionArn=pipeline_execution_arn
-        )["PipelineExecutionSteps"]
-        training_job_arn = [
-            s["Metadata"]["TrainingJob"]["Arn"]
-            for s in steps
-            if s["StepName"] == step_name
-        ][0]
-        training_job_name = training_job_arn.split("/")[-1]
-        outputs = self.sm_client.describe_training_job(
-            TrainingJobName=training_job_name
-        )
-        return outputs["ModelArtifacts"]["S3ModelArtifacts"]
-
-    def get_data_check_baseline_uri(self, model_package_arn: str):
-        try:
-            model_details = self.sm_client.describe_model_package(ModelPackageName=model_package_arn)
-            print(model_details)
-            baseline_uri = model_details['DriftCheckBaselines']['ModelDataQuality']['Constraints']['S3Uri']
-            baseline_uri = baseline_uri.replace('/constraints.json','') # returning the folder containing constraints and statistics
-            return baseline_uri
-        except ClientError as e:
-            error_message = e.response["Error"]["Message"]
-            logger.error(error_message)
-            raise Exception(error_message)
