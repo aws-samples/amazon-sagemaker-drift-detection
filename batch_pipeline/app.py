@@ -49,14 +49,6 @@ def create_pipeline(
         )[0]
         batch_config.model_package_arn = p["ModelPackageArn"]
 
-    # Get the pipeline execution to get the baseline uri
-    pipeline_execution_arn = registry.get_pipeline_execution_arn(
-        batch_config.model_package_arn
-    )
-    logger.info(f"Got pipeline execution arn: {pipeline_execution_arn}")
-    model_uri = registry.get_model_artifact(pipeline_execution_arn)
-    logger.info(f"Got model uri: {model_uri}")
-
     # Set the sagemaker pipeline name and description with model version
     sagemaker_pipeline_name = f"{project_name}-batch-{stage_name}"
     sagemaker_pipeline_description = (
@@ -89,7 +81,7 @@ def main(
     region: str,
     sagemaker_pipeline_role_arn: str,
     artifact_bucket: str,
-    evaluate_drift_function_arn: str,
+    # evaluate_drift_function_arn: str,
 ):
     # Create App and stacks
     app = cdk.App()
@@ -98,10 +90,8 @@ def main(
         app=app,
         project_name=project_name,
         project_id=project_id,
-        region=region,
         sagemaker_pipeline_role_arn=sagemaker_pipeline_role_arn,
         artifact_bucket=artifact_bucket,
-        evaluate_drift_function_arn=evaluate_drift_function_arn,
         stage_name="staging",
     )
 
@@ -109,10 +99,8 @@ def main(
         app=app,
         project_name=project_name,
         project_id=project_id,
-        region=region,
         sagemaker_pipeline_role_arn=sagemaker_pipeline_role_arn,
         artifact_bucket=artifact_bucket,
-        evaluate_drift_function_arn=evaluate_drift_function_arn,
         stage_name="prod",
     )
 
@@ -131,10 +119,10 @@ if __name__ == "__main__":
         "--sagemaker-pipeline-role-arn",
         default=os.environ.get("SAGEMAKER_PIPELINE_ROLE_ARN"),
     )
-    parser.add_argument(
-        "--evaluate-drift-function-arn",
-        default=os.environ.get("EVALUATE_DRIFT_FUNCTION_ARN"),
-    )
+    # parser.add_argument(
+    #     "--evaluate-drift-function-arn",
+    #     default=os.environ.get("EVALUATE_DRIFT_FUNCTION_ARN"),
+    # )
     parser.add_argument(
         "--artifact-bucket",
         default=os.environ.get("ARTIFACT_BUCKET"),

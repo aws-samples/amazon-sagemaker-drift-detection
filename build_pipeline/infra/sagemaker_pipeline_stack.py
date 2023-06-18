@@ -25,15 +25,6 @@ class SageMakerPipelineStack(cdk.Stack):
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-
-        sagemaker.CfnModelPackageGroup(
-            self,
-            "ModelPackageGroup",
-            model_package_group_name=model_package_group_name,
-            model_package_group_description=pipeline_description,
-            tags=tags,
-        )
-
         sagemaker.CfnPipeline(
             self,
             "Pipeline",

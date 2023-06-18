@@ -16,6 +16,7 @@ names = [
     "Endpoint",
     "Image",
     "Model",
+    "ModelGroup",
     "ModelDeployment",
     "ProcessingJob",
     "TrainingJob",
@@ -26,32 +27,30 @@ colors = {
 }
 
 
-def create_legend_notes():
+def create_legend_notes(net):
     # Add Legend Nodes
     step = 50
-    x = -300
+    x = -500
     y = -250
     legend_nodes = [
-        (
-            name,
-            {
-                "group": legend_node,
-                "label": str(legend_node),
-                "size": 30,
-                # 'fixed': True, # So that we can move the legend nodes around to arrange them better
-                "physics": False,
-                "x": x,
-                "y": f"{y + legend_node*step}px",
-                "shape": "box",
-                "widthConstraint": 50,
-                "font": {"size": 20},
-                "color": color,
-            },
-        )
-        for name, color in colors.items()
+        dict(
+            n_id=legend_node,
+            label=label,
+            # group=legend_node,
+            physics=False,
+            size=30,
+            x=x,
+            y=f"{y + legend_node*step}px",
+            shape="box",
+            font={"size": 20},
+            color=colors[label],
+            )
+        for legend_node, label in enumerate(names)
     ]
-    print(legend_nodes)
-    return legend_nodes
+    # print(legend_nodes)
+    [net.add_node(**node) for node in legend_nodes]
+
+    return
 
 
 class Visualizer:
@@ -74,8 +73,8 @@ class Visualizer:
                 shape="circle",
                 color=colors[label],
             )
-        
-        # net.add_nodes_from(create_legend_notes())
+
+        create_legend_notes(net)
 
         for edge in query_lineage_response["Edges"]:
             source = edge["SourceArn"]

@@ -18,7 +18,7 @@ sagemaker_session = sagemaker.Session(
 
 def get_pipeline_arn_from_endpoint(endpoint_name: str):
     logger.info(f"Endpoint: {endpoint_name}")
-    endpoint_arn = f"arn:aws:sagemaker:{cdk.Aws.REGION}:{cdk.Aws.ACCOUNT_ID}:endpoint/{endpoint_name}"
+    endpoint_arn = f"arn:aws:sagemaker:{cdk.Aws.REGION}:{cdk.Aws.ACCOUNT_ID}:endpoint/{endpoint_name}"  # noqa: E501
 
     contexts = Context.list(
         source_uri=endpoint_arn,

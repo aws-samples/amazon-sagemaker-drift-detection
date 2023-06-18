@@ -73,7 +73,6 @@ def get_pipeline(
     pipeline_name,
     model_package_group_name,
     default_bucket,
-    base_job_prefix,
     commit_id: str = None,
 ):
     """Gets a SageMaker ML Pipeline instance working with on nyc taxi data.
@@ -83,7 +82,6 @@ def get_pipeline(
         default_bucket: the bucket to use for storing the artifacts
         pipeline_name: the bucket to use for storing the artifacts
         model_package_group_name: the model package group name
-        base_job_prefix: the prefix to include after the bucket
     Returns:
         an instance of a pipeline
     """
@@ -126,7 +124,7 @@ def get_pipeline(
     output_common_path = [
         "s3:/",
         default_bucket,
-        "build-pipeline-runs",
+        pipeline_name,
         Join(
             on="-",
             values=[
@@ -324,7 +322,7 @@ def get_pipeline(
     step_eval = ProcessingStep(
         name="EvaluateModel",
         step_args=script_eval.run(
-            job_name=f"scripts/{commit_id[:8]}/evaluation",
+            # job_name=f"scripts/{commit_id[:8]}/evaluation",
             inputs=[
                 ProcessingInput(
                     source=step_train.properties.ModelArtifacts.S3ModelArtifacts,
@@ -397,6 +395,7 @@ def get_pipeline(
 
     step_register = ModelStep(
         name="RegisterModel",
+        display_name="RegisterModel",
         step_args=model.register(
             content_types=["text/csv"],
             response_types=["text/csv"],
@@ -461,11 +460,11 @@ def get_pipeline(
     return pipeline
 
 
-def upload_pipeline(pipeline: Pipeline, default_bucket, base_job_prefix):
+def upload_pipeline(pipeline: Pipeline, default_bucket):
     # Get the pipeline definition
     pipeline_definition_body = pipeline.definition()
     # Upload the pipeline to a unique location in s3 based on git commit and timestamp
-    pipeline_name = name_from_base(f"{base_job_prefix}/pipeline")
+    pipeline_name = name_from_base(f"{pipeline.name}/pipeline-definition")
     S3Uploader.upload_string_as_file_body(
         pipeline_definition_body, f"s3://{default_bucket}/{pipeline_name}.json"
     )

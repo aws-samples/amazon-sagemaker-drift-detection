@@ -223,7 +223,19 @@ class ServiceCatalogStack(cdk.Stack):
                 ],
             )
         )
-
+        cloudformation_role.add_to_principal_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "ssm:GetParameters",
+                ],
+                resources=[
+                    "*",
+                    self.format_arn(
+                        resource="parameter", service="ssm", resource_name="sagemaker*"
+                    ),
+                ],
+            )
+        )
         cloudformation_role.add_to_principal_policy(
             iam.PolicyStatement(
                 actions=[

@@ -31,7 +31,6 @@ def main(
         default_bucket=artifact_bucket,
         model_package_group_name=model_package_group_name,
         pipeline_name=sagemaker_pipeline_name,
-        base_job_prefix=project_id,
         commit_id=commit_id,
     )
 

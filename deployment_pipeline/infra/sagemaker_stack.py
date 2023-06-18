@@ -5,6 +5,7 @@ from aws_cdk import aws_applicationautoscaling as applicationautoscaling
 from aws_cdk import aws_cloudwatch as cloudwatch
 from aws_cdk import aws_events as events
 from aws_cdk import aws_sagemaker as sagemaker
+from aws_cdk.aws_sagemaker import CfnEndpointConfig
 from constructs import Construct
 
 from infra.sagemaker_lineage_utils import get_pipeline_arn_from_model
@@ -47,7 +48,7 @@ class SageMakerStack(cdk.Stack):
         )
 
         # Create the production variant
-        model_variant = sagemaker.CfnEndpointConfig.ProductionVariantProperty(
+        model_variant = CfnEndpointConfig.ProductionVariantProperty(
             initial_instance_count=variant_config.instance_count,
             initial_variant_weight=variant_config.initial_variant_weight,
             instance_type=variant_config.instance_type,
@@ -55,7 +56,7 @@ class SageMakerStack(cdk.Stack):
             variant_name=variant_name,
         )
 
-        endpoint_config = sagemaker.CfnEndpointConfig(
+        endpoint_config = CfnEndpointConfig(
             self,
             "EndpointConfig",
             production_variants=[model_variant],
@@ -63,19 +64,15 @@ class SageMakerStack(cdk.Stack):
 
         # Enable data capture for scheduling
         if deployment_config.schedule_config is not None:
-            endpoint_config.data_capture_config = sagemaker.CfnEndpointConfig.DataCaptureConfigProperty(
+            endpoint_config.data_capture_config = CfnEndpointConfig.DataCaptureConfigProperty(  # noqa: E501
                 enable_capture=True,
                 destination_s3_uri=data_capture_uri,
                 initial_sampling_percentage=deployment_config.schedule_config.data_capture_sampling_percentage,
                 capture_options=[
-                    sagemaker.CfnEndpointConfig.CaptureOptionProperty(
-                        capture_mode="Input"
-                    ),
-                    sagemaker.CfnEndpointConfig.CaptureOptionProperty(
-                        capture_mode="Output"
-                    ),
+                    CfnEndpointConfig.CaptureOptionProperty(capture_mode="Input"),
+                    CfnEndpointConfig.CaptureOptionProperty(capture_mode="Output"),
                 ],
-                capture_content_type_header=sagemaker.CfnEndpointConfig.CaptureContentTypeHeaderProperty(
+                capture_content_type_header=CfnEndpointConfig.CaptureContentTypeHeaderProperty(
                     csv_content_types=["text/csv"],
                     json_content_types=["application/json"],
                 ),

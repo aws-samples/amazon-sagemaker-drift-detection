@@ -9,7 +9,6 @@ Implements a get_pipeline(**kwargs) method.
 """
 import os
 
-# from sagemaker.model import ModelPackage
 from sagemaker.model_monitor.dataset_format import DatasetFormat
 from sagemaker.s3 import S3Uploader
 from sagemaker.transformer import Transformer
@@ -17,8 +16,6 @@ from sagemaker.utils import name_from_base
 from sagemaker.workflow.check_job_config import CheckJobConfig
 from sagemaker.workflow.execution_variables import ExecutionVariables
 from sagemaker.workflow.functions import Join
-
-# from sagemaker.workflow.model_step import ModelStep
 from sagemaker.workflow.monitor_batch_transform_step import MonitorBatchTransformStep
 from sagemaker.workflow.parameters import (
     ParameterBoolean,
@@ -105,7 +102,7 @@ def get_pipeline(
             on="/",
             values=output_common_path + ["dataqualitycheck"],
         ),
-        post_analytics_processor_script="pipelines/postprocess_monitor_script.py"
+        post_analytics_processor_script="pipelines/postprocess_monitor_script.py",
     )
 
     # Transform Step arguments
@@ -153,14 +150,3 @@ def get_pipeline(
         ],
         sagemaker_session=sagemaker_session,
     )
-
-
-def upload_pipeline(pipeline: Pipeline, default_bucket, base_job_prefix) -> str:
-    # Get the pipeline definition
-    pipeline_definition_body = pipeline.definition()
-    # Upload the pipeline to a unique location in s3 based on git commit and timestamp
-    pipeline_key = f"{name_from_base(base_job_prefix)}/pipeline.json"
-    S3Uploader.upload_string_as_file_body(
-        pipeline_definition_body, f"s3://{default_bucket}/{pipeline_key}"
-    )
-    return pipeline_key
